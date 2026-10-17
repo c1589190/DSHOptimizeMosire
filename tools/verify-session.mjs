@@ -23,7 +23,7 @@ const ZSTD_MAGIC = 0xfd2fb528
 const BOOTSTRAP_TOOLS = ['bash', 'str_replace_editor']
 const PERSONA_LINE = 'You are a helpful software engineer assistant.'
 const HARNESS_IDENTITY_MARKERS = ['You are an AI agent powered by DeepSeek Harness']
-const FIRST_STEP_ALLOWED_SOURCES = new Set(['user'])
+const FIRST_STEP_ALLOWED_SOURCES = new Set(['user', 'user-approval'])
 
 /** Split a concatenated-Zstandard buffer into independent frame slices. */
 export function splitZstdFrames(buf) {
@@ -82,6 +82,18 @@ const textOf = (content) => {
 }
 
 const messageOf = (event) => event.data?.message ?? event.data ?? {}
+
+/** Effective preset: the creation-time header default, overridden by any selection event. */
+export function effectivePreset(events) {
+  const header = events.find((event) => event.type === 'session')
+  let preset = header?.agentPreset
+  for (const event of events) {
+    if (event.type === 'agent-preset/selected' && typeof event.data?.agentPreset === 'string') {
+      preset = event.data.agentPreset
+    }
+  }
+  return preset
+}
 const sourceKindOf = (event) => messageOf(event).source?.kind ?? event.data?.source?.kind
 const toolsOf = (header) => (header.data?.header?.tools ?? []).map((tool) => tool.name)
 
@@ -108,10 +120,11 @@ export function analyzeSession(events, options = {}) {
   const warnings = []
   const record = (name, ok, detail) => checks.push({ name, ok, detail })
 
-  record('session header present', header !== undefined, header ? `preset=${header.agentPreset}` : 'no session header')
+  const preset = effectivePreset(events)
+  record('session header present', header !== undefined, header ? `created as preset=${header.agentPreset}, effective=${preset}` : 'no session header')
 
   if (header !== undefined) {
-    record('agent preset', header.agentPreset === expectedPreset, `expected ${expectedPreset}, got ${header.agentPreset}`)
+    record('agent preset', preset === expectedPreset, `expected ${expectedPreset}, got ${preset}`)
   }
 
   if (firstHeader === undefined) {
@@ -119,7 +132,7 @@ export function analyzeSession(events, options = {}) {
     const failed = checks.filter((c) => !c.ok).map((c) => `${c.name}: ${c.detail}`)
     return {
       sessionId: header?.id,
-      preset: header?.agentPreset,
+      preset,
       delegationDepth: header?.delegationDepth ?? 0,
       events: events.length,
       checks,
@@ -207,7 +220,7 @@ export function analyzeSession(events, options = {}) {
   const failures = checks.filter((check) => check.ok === false).map((check) => `${check.name}: ${check.detail}`)
   return {
     sessionId: header?.id,
-    preset: header?.agentPreset,
+    preset,
     delegationDepth: header?.delegationDepth ?? 0,
     events: events.length,
     checks,

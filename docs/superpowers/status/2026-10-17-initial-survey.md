@@ -78,9 +78,11 @@
 - **M0 修正（16:20）**：静态声明不可用（include 相对路径以 profile 目录为 base）→ 改 host 插件声明；
   又遇官方裸包名从 workspace 包内不可解析（行 "never started"）→ `tools/link-dsh-peers.mjs` symlink 26 个官方包。
   修复后 `~/.dsh/liangshen-anchored-status.json` = `broken: null`（21 行全激活）。
-- **T3 真实会话协议证据**：待用户刷新 GUI 后新建「梁神模式」会话 → 触发工具调用 → `/compact` → 再发消息；
-  之后 `node tools/verify-session.mjs <新会话日志> --preset liangshen` 断言 B1/B2/B3/C1/D1。
-- **T4 Windows 后台任务**（config-gated，默认关；本机 linux 只能单测 + 标注未实机）。
+- **T3 真实会话协议证据：已完成（2026-10-17 16:21）**。会话 `session-d3ee6e14…`（workspace /home/cna/tp/1）：
+  `verify-session --preset liangshen` → **failures: []**；B1/B2/B3/C1/D1 全过（首轮双工具、单行 persona、零注入、
+  晋升 45 工具、压缩后回 2 工具再晋升）。证据：`.superpowers/sdd/2026-10-17-liangshen-anchored/evidence/l2-real-session.log`。
+  未验证：E1 子代理、F1 resume 重启、H Windows 实机。
+- **T4 Windows 后台任务**（config-gated，默认关；本机 linux 只能单测 + 标注未实机）—— 进行中。
 - 功能二（goal 确认门）尚未开工；开工前建议先完成功能一 T3 证据，避免两个新 bundle 同时干扰运行时。
 
 ### 仓库

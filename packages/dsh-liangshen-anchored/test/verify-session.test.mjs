@@ -25,6 +25,7 @@ const requestHeader = (seq, tools) => ({
   type: 'request/header', seq, data: { header: { tools: tools.map((name) => ({ name })) }, reason: 'initial' },
 })
 const signal = (seq, type = 'tool/call') => ({ type, seq })
+const selection = (seq, preset) => ({ type: 'agent-preset/selected', seq, data: { agentPreset: preset } })
 
 function goodSession(overrides = {}) {
   return [
@@ -72,6 +73,22 @@ test('a promoted request that stays at the bootstrap pair fails', () => {
 test('a post-compaction request that stays wide fails re-anchor', () => {
   const report = analyzeSession(goodSession({ reanchorTools: FULL }))
   assert.match(report.failures.join('\n'), /compaction re-anchor/)
+})
+
+test('a selection event before the first turn overrides the creation-time default', () => {
+  const session = goodSession()
+  session[0] = sessionHeader('standard') // creation default
+  session.splice(1, 0, selection(1, 'liangshen'))
+  const report = analyzeSession(session)
+  assert.equal(report.preset, 'liangshen')
+  assert.deepEqual(report.failures, [])
+})
+
+test('user-approval messages in the first step are user-originated and allowed', () => {
+  const session = goodSession()
+  session.splice(1, 0, userMessage(2, 'user-approval'), userMessage(2, 'user-approval'))
+  const report = analyzeSession(session)
+  assert.deepEqual(report.failures, [])
 })
 
 test('a preset mismatch fails', () => {
