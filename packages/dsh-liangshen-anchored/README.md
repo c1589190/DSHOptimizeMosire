@@ -1,0 +1,56 @@
+# @mosire/dsh-liangshen-anchored
+
+「梁神模式（锚定式）」的现代复刻：把社区已停用的 **anchored standard** 梁神预设，以官方
+`@deepseek-ai/dsh-agent-preset` 声明机制重新装回 DSH Web profile。
+
+## 它做什么
+
+1. **首轮锚定**：新会话第一条模型请求只暴露官方 Minimal 精确双工具
+   （持久 `bash` + `str_replace_editor`），并把 skill 目录、AGENTS.md 摘要、runtime-context
+   与一切自动注入挡在首轮之外（`context-gate` + `tool-bootstrap`）。
+2. **首调晋升**：首个持久晋升信号（`tool/call` 或 `assistant/message`，`promoteOn: either`）
+   之后，下一条请求放开完整组装目录。
+3. **压缩重锚**：`compaction/end` 之后 epoch 感知地回到受控态，等新的持久信号再晋升。
+4. **子代理同相位**：`includeSubagents: true`，子代理首轮同样锚定。
+
+系统提示词与官方 Minimal 逐字节一致（单行 persona），AGENTS.md 不在首轮注入；
+晋升后由 `instruction-hint` 注入一条非命令式提示，模型自己读文件。
+
+## 安装（Web profile）
+
+```sh
+dsh plugin --profile web add link:/home/cna/DSHOptimizeMosire/packages/dsh-liangshen-anchored
+# 或由 plugin_manager install_bundle 安装到当前 profile
+```
+
+装完新开会话，在预设选择器里选「梁神模式」。
+
+## 目录
+
+```
+cordis.patch.yml                  # 插入 preset-liangshen 声明
+presets/liangshen/
+  preset.yml                      # 名称/order 元数据
+  agent.cordis.yml                # 21 行组合（context-gate 首行）
+  tool-bootstrap.mjs              # 首轮收窄 + 晋升（v7）
+  context-gate.mjs                # 统一注入控制（上游）
+  instruction-hint.mjs            # 晋升后一条指令文件提示
+  skill-search.mjs                # 按需 skill 检索（替代全量目录注入）
+  custom-bash.mjs                 # Windows Git Bash 等价 bash
+  compaction-epoch.mjs            # 晋升纪元（压缩感知）
+  session-events.mjs
+test/                             # node --test（25 条）
+lib/index.js                      # 合法占位（manifest 导出目标）
+```
+
+## 验证
+
+```sh
+cd packages/dsh-liangshen-anchored && node --test test/*.test.mjs
+# 真实会话协议断言：
+node ../../tools/verify-session.mjs <session.v4.jsonl.zstd> --preset liangshen
+```
+
+## 许可
+
+MIT。移植来源与版权声明见 `NOTICE`。

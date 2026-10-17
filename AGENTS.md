@@ -71,10 +71,11 @@
 - `docs/AGENTS.md` —— 六层归宿表 · 口径优先级 · 取代关系写作 · `file:line` 与生成命令 · 日期口径 · 上游引用纪律。
 - `.superpowers/AGENTS.md` —— SDD 台账/证据落点与形制（不进 git）。
 
-**③ 设计 spec（待用户评审）**
+**③ 设计 spec 与实现计划（已获用户批准，2026-10-17）**
 
 - `docs/superpowers/specs/2026-10-17-liangshen-anchored-design.md` —— 功能一：骨架/承载 M0 决策门/移植矩阵/晋升状态机/验收判据/里程碑。
 - `docs/superpowers/specs/2026-10-17-goal-confirm-gate-design.md` —— 功能二：拦截算法/问题文案/配置/降级/验证与 spike。
+- `docs/superpowers/plans/2026-10-17-liangshen-anchored.md`、`docs/superpowers/plans/2026-10-17-goal-confirm-gate.md` —— 逐任务实现计划。
 
 **④ 状态与交接**
 
@@ -112,7 +113,8 @@ D-004=沿用「梁神模式」/ order 5 / MIT；D-005=协议级 smoke + 12 会�
 **功能二（goal 续轮确认门）**：G-001=A 官方提问卡片；G-002=A 全局挂载；G-003=A 关闭卡片=取消并删 goal；G-004=A 独立 bundle。
 
 **当前门禁（必须遵守）**：
-1. 两份 spec 已落盘（见 §四③），**等用户评审**；spec 评审通过前**不写实现代码、不进实现计划**。
-2. spec 通过后 → `writing-plans` 出实现计划 → 用户确认 → 按里程碑实现（M0 承载 spike 先行）。
+1. 两份 spec 与实现计划已获用户批准（2026-10-17「开始吧」），并已提交推送；实现进行中。
+2. 进度：功能一 **M0 承载 spike 通过 / T1 骨架 / T2 移植+单测 / T3 verifier / T5 元数据完成**；
+   T3 真实会话协议证据待用户手工验证，T4（Windows 后台任务，config-gated）待做。
 3. 任何新增「待裁定」先做口径溯源并落盘，已有裁定不重复问（见 `docs/AGENTS.md` §二）。
-4. 不擅自 `git commit`；当前仓库为 `git init` 后未提交状态，提交须用户批准。
+4. 用户 2026-10-17 已授权本阶段 `git commit` + push 到 `git@github.com:c1589190/DSHOptimizeMosire.git`（main）。

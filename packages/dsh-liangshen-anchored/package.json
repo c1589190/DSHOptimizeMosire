@@ -3,10 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Anchored LiangShen mode preset (faithful port of the community anchored-standard design) for DeepSeek Harness Web profiles.",
+  "description": "Anchored LiangShen preset for DeepSeek Harness Web profiles: Minimal tool pair on the first request, full catalog after the first durable promotion, re-anchor after every compaction.",
   "exports": {
     ".": "./lib/index.js",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json",
+    "./icon.svg": "./icon.svg"
   },
   "peerDependencies": {
     "@deepseek-ai/dsh": ">=0.2.0-rc.2"
@@ -18,5 +20,16 @@
     "bundle": {
       "patch": "./cordis.patch.yml"
     }
-  }
+  },
+  "icon": "./icon.svg",
+  "files": [
+    "lib/",
+    "presets/",
+    "locale/",
+    "icon.svg",
+    "NOTICE",
+    "LICENSE",
+    "README.md",
+    "cordis.patch.yml"
+  ]
 }

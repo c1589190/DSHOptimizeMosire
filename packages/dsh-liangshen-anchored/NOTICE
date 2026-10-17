@@ -1,0 +1,25 @@
+DSHOptimizeMosire · dsh-liangshen-anchored
+==========================================
+
+This package ports the community "anchored standard" LiangShen agent preset to
+the current DeepSeek Harness preset declaration mechanism. It is not an
+official DeepSeek preset and is not affiliated with or endorsed by DeepSeek.
+
+Upstream sources and licenses
+-----------------------------
+1. DeepSeek Harness built-in presets (`minimal`, `standard`, `ptc`)
+   Copyright DeepSeek, MIT License.
+   The `persona` row and the bootstrap tool pair (`bash` + `str_replace_editor`)
+   are byte-compatible with the shipped `minimal` preset.
+
+2. @deepseek-harness-tui/dsh-tui `presets/liangshen/` (revision
+   `liangshen-ptc-runtime-compat-v7`), MIT License.
+   Files ported verbatim: `tool-bootstrap.mjs`, `instruction-hint.mjs`,
+   `skill-search.mjs`, `custom-bash.mjs`, `compaction-epoch.mjs`,
+   `session-events.mjs`, and the composition baseline.
+
+3. xiaobright/dsh-anchored-standard `preset/context-gate.mjs`, MIT License.
+   Ported verbatim as the unified injection gate (runtime-context blanking +
+   pre-step allowlist) added on top of the v7 composition.
+
+本地移植记录见仓库 docs/agents/00-调研-梁神模式谱系.md 与 .superpowers/sdd/2026-10-17-liangshen-anchored/impl-ledger.md。

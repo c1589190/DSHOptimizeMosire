@@ -61,3 +61,25 @@
   （TUI 源码显示同款做法，但本机未实装验证）。
 - 未核 TUI 包与早期锚定版 preset 的许可证（dsh-web Apache-2.0、DSH MIT 已知；`presets/liangshen` 基于官方 Minimal/Standard/PTC 的 MIT 修改，需在 spec 里写清合规路径）。
 - 未测算双分支 / guard 等优化项的实际收益；issue #266 的 22/22 是作者自测，非隔离对照。
+
+## 七、实现进度（2026-10-17 下午，用户批准"开始吧"后）
+
+### 已完成
+- **M0 承载 spike**：静态 bundle patch 声明 `preset-liangshen` 可用；`include` 相对路径
+  `./presets/liangshen/agent.cordis.yml` 在安装包内解析成功；行 `fiberPhase: active`。
+  （坑：bundle patch 顶层 `config` 的 `!!js` 不求值 → 必须纯静态 config。）
+- **T1/T2 移植**：21 row 组合（v7 20 row + context-gate 首行）；7 个 `.mjs` 插件随包；
+  `promoteOn: either` 三处同步；`includeSubagents: true` 三处同步。安装 `application: applied`、无 warnings。
+  单测 25/25（epoch 状态机 8、组合一致性 6、verify-session 11）。
+- **T3 工具**：`tools/verify-session.mjs`（多帧 zstd 帧游走 + 协议断言），真实 16MB 大会话解析通过。
+- **T5 元数据**：locale/icon/NOTICE/LICENSE/README；`node --check` 全绿。
+
+### 进行中 / 待验证
+- **T3 真实会话协议证据**：需用户在 Web GUI 新建「梁神模式」会话 → 触发工具调用 → `/compact` → 再发消息；
+  之后 `node tools/verify-session.mjs <新会话日志> --preset liangshen` 断言 B1/B2/B3/C1/D1。
+- **T4 Windows 后台任务**（config-gated，默认关；本机 linux 只能单测 + 标注未实机）。
+- 功能二（goal 确认门）尚未开工；开工前建议先完成功能一 T3 证据，避免两个新 bundle 同时干扰运行时。
+
+### 仓库
+- 远程：`git@github.com:c1589190/DSHOptimizeMosire.git`（main）；已推送至 `485b067` 之后若干提交。
+- 证据：`.superpowers/sdd/2026-10-17-liangshen-anchored/`（本机留痕，不进 git）。
