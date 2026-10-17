@@ -1,0 +1,34 @@
+{
+  "name": "@mosire/dsh-subagent-access",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Model-facing controls for the sub-agent sessions a session started: list, message, and interrupt its direct children through the official subagent service.",
+  "icon": "./icon.svg",
+  "exports": {
+    ".": "./lib/index.js",
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json",
+    "./icon.svg": "./icon.svg"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/dsh": ">=0.2.0-rc.2"
+  },
+  "files": [
+    "lib/",
+    "locale/",
+    "icon.svg",
+    "NOTICE",
+    "LICENSE",
+    "README.md",
+    "cordis.patch.yml"
+  ],
+  "dsh": {
+    "engines": {
+      "dsh": ">=0.2.0-rc.2"
+    },
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  }
+}

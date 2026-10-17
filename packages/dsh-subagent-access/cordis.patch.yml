@@ -1,0 +1,7 @@
+# Parent → child sub-agent controls: one Host plugin row, mounted profile-wide.
+# Config defaults live in lib/catalog.js (enabled=true,
+# includeDelegatedAgents=false); override them in this row or from the Host
+# settings surface.
+- insert:
+    - id: subagent-access
+      name: '@mosire/dsh-subagent-access'

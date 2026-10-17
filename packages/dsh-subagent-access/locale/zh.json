@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "子 Agent 访问",
+    "description": "给顶层会话补回父 → 子控制面：列出、发消息、中断本会话启动的子 Agent。只调官方 subagent 服务，默认只装在 root 会话，不新增系统提示词。"
+  }
+}

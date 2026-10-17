@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Subagent Access",
+    "description": "Adds parent → child controls to top-level sessions: list, message, and interrupt sub-agents this session started. Uses only the official subagent service, installs in root sessions by default, and adds no system-prompt section."
+  }
+}

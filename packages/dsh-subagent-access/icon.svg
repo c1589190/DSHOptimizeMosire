@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Sub-agent access">
+  <rect width="64" height="64" rx="14" fill="#1f2937"/>
+  <circle cx="18" cy="32" r="7" fill="#fbbf24"/>
+  <path d="M25 32h9c3 0 5-2 5-5v-7" fill="none" stroke="#94a3b8" stroke-width="3" stroke-linecap="round"/>
+  <path d="M25 32h9c3 0 5 2 5 5v7" fill="none" stroke="#94a3b8" stroke-width="3" stroke-linecap="round"/>
+  <circle cx="46" cy="17" r="5" fill="none" stroke="#fbbf24" stroke-width="2.5"/>
+  <circle cx="46" cy="47" r="5" fill="none" stroke="#fbbf24" stroke-width="2.5"/>
+  <path d="M43 17h6M46 14v6M43 47h6" fill="none" stroke="#fbbf24" stroke-width="2.5" stroke-linecap="round"/>
+</svg>

@@ -1,0 +1,36 @@
+DSHOptimizeMosire · dsh-subagent-access
+=======================================
+
+This package adds a parent → child sub-agent control surface to DeepSeek
+Harness (DSH) profiles: list, message, and interrupt the sub-agent sessions a
+top-level session started. It is not an official DeepSeek package and is not
+affiliated with or endorsed by DeepSeek.
+
+Official extension points only
+------------------------------
+The plugin is implemented entirely with public DSH extension points:
+
+- the `ctx.subagents` service (`listChildren` / `sendMessage` / `interrupt`);
+- the `ctx.agents` registry (`get` / `list`) and each Agent's live status;
+- per-Agent tool registration through `agent.ctx.tools.register` and the
+  official `defineTool` helper from `@deepseek-ai/dsh-tools`;
+- the `agent/created` and `agent/disposed` lifecycle events.
+
+No DSH source code was copied into this package. The three tools are
+deliberately named differently from the Agent Team tools (`send_message` /
+`list_agents` / `interrupt_agent`): this bundle neither modifies Agent Team nor
+duplicates its behaviour. It is a Host plugin loaded through a bundle patch and
+does not modify any DSH package.
+
+Workspace module resolution
+---------------------------
+The workspace package has no npm dependencies. Its single official import
+(`@deepseek-ai/dsh-tools`) resolves through the symlink farm that
+`tools/link-dsh-peers.mjs` creates in `node_modules/@deepseek-ai/`, pointing at
+the running DSH installation so both sides share one module instance.
+
+Local porting notes live in the repository under
+docs/agents/03-调研-子Agent访问.md,
+docs/superpowers/specs/2026-10-17-subagent-access-design.md and
+.superpowers/sdd/2026-10-17-subagent-access/ (the latter is a local,
+non-versioned record).
