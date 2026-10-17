@@ -1,0 +1,28 @@
+DSHOptimizeMosire · dsh-goal-confirm
+====================================
+
+This package adds a confirmation gate in front of automatic goal rounds in
+DeepSeek Harness (DSH) Web profiles. It is not an official DeepSeek package
+and is not affiliated with or endorsed by DeepSeek.
+
+Official extension points only
+------------------------------
+The plugin is implemented entirely with public DSH extension points:
+
+- the `agent/pre-step` waterfall event (a `prepend` listener holds the step);
+- the `ctx.goals` service (`get` / `clear` / `pause`);
+- the `ctx.userQuestions` service (`ask`).
+
+No DSH source code was copied into this package. The gate is a Host plugin
+loaded through a bundle patch and does not modify any DSH package.
+
+Reused UI
+---------
+The question card rendered on the Web side is the official
+`@deepseek-ai/dsh-client-ui-user-questions` package shipped with DSH
+(MIT License, Copyright DeepSeek). This bundle ships no browser code of its
+own; it reuses that card exactly as installed.
+
+Local porting notes live in the repository under
+docs/agents/02-调研-goal续轮确认门.md and .superpowers/sdd/2026-10-17-goal-confirm/
+(the latter is a local, non-versioned record).
