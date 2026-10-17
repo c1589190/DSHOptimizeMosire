@@ -1,9 +1,10 @@
-# The anchored LiangShen bundle.
+# The anchored LiangShen bundle (two presets: `liangshen` and its
+# empty-system-prompt variant `liangshen-empty-system`).
 #
 # A static preset row cannot carry the composition (the include path would
 # resolve against the profile directory). This patch therefore inserts the
-# bundle's own Host plugin, which declares the preset at activation with an
-# absolute file:// URL for the bundled composition; see lib/index.js.
+# bundle's own Host plugin, which declares the presets at activation with
+# absolute file:// URLs for the bundled compositions; see lib/index.js.
 - insert:
     - id: liangshen-anchored
       name: '@mosire/dsh-liangshen-anchored'

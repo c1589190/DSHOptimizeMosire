@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 /**
  * verify-session — protocol-level acceptance checker for the anchored LiangShen
- * preset, reading a DSH session log directly from disk.
+ * presets, reading a DSH session log directly from disk. `liangshen` expects the
+ * minimal persona as the only system prompt; `liangshen-empty-system` expects
+ * that same slot to be exactly one ASCII space (everything else is identical).
  *
  * Session logs are a CONCATENATION of independent Zstandard frames (one header
  * frame, then one frame per durable append batch), so Node's single-frame
@@ -9,11 +11,18 @@
  * format to split frames, then decodes each frame on its own.
  *
  * Usage:
- *   node tools/verify-session.mjs <session.v4.jsonl.zstd> [--preset liangshen]
+ *   node tools/verify-session.mjs <session.v4.jsonl.zstd>
+ *     [--preset <preset-id>] [--system-prompt persona|space]
+ *
+ * The system-prompt assertion mode follows the preset:
+ * `liangshen-empty-system` → `space`, every other preset → `persona`. When
+ * `--preset` is omitted the session's recorded preset decides, so an
+ * empty-system session log verifies its own condition by default.
  *
  * Exit code 0 = all checks passed; 1 = at least one failure (`failures` in the
- * JSON report). Checks with no applicable evidence (e.g. no compaction in the
- * session) are reported as skipped, never as passed.
+ * JSON report); 2 = usage error (bad arguments or unknown system-prompt mode).
+ * Checks with no applicable evidence (e.g. no compaction in the session) are
+ * reported as skipped, never as passed.
  */
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
@@ -22,6 +31,9 @@ import { zstdDecompressSync } from 'node:zlib'
 const ZSTD_MAGIC = 0xfd2fb528
 const BOOTSTRAP_TOOLS = ['bash', 'str_replace_editor']
 const PERSONA_LINE = 'You are a helpful software engineer assistant.'
+const EMPTY_SYSTEM_PROMPT = ' '
+const EMPTY_SYSTEM_PRESET = 'liangshen-empty-system'
+const SYSTEM_PROMPT_MODES = new Set(['persona', 'space'])
 const HARNESS_IDENTITY_MARKERS = ['You are an AI agent powered by DeepSeek Harness']
 const FIRST_STEP_ALLOWED_SOURCES = new Set(['user', 'user-approval'])
 
@@ -108,19 +120,40 @@ export function firstSystemMessage(events) {
 }
 
 /**
+ * Resolve which system-prompt assertion to run: an explicit override wins,
+ * otherwise `liangshen-empty-system` implies `space` and everything else
+ * implies `persona` (backward compatible with pre-variant sessions).
+ * Unknown modes are a caller error, not a session failure.
+ */
+export function resolveSystemPromptMode(preset, override) {
+  const mode = override ?? (preset === EMPTY_SYSTEM_PRESET ? 'space' : 'persona')
+  if (!SYSTEM_PROMPT_MODES.has(mode)) {
+    throw new Error(
+      `verify-session: unknown system prompt mode ${JSON.stringify(mode)}; expected persona or space`,
+    )
+  }
+  return mode
+}
+
+/**
  * Analyze decoded session rows against the anchored-preset protocol.
- * @returns {{ sessionId, preset, delegationDepth, events, checks, failures, warnings }}
+ * @returns {{ sessionId, preset, systemPrompt, delegationDepth, events, checks, failures, warnings }}
  */
 export function analyzeSession(events, options = {}) {
-  const expectedPreset = options.preset ?? 'liangshen'
-  const bootstrap = [...(options.bootstrapTools ?? BOOTSTRAP_TOOLS)].sort()
   const header = events.find((event) => event.type === 'session')
+  const preset = effectivePreset(events)
+  // Without an explicit `preset`, a session created (or switched to) the
+  // empty-system variant is judged against that variant; every other session
+  // keeps the historical `liangshen` expectation.
+  const expectedPreset =
+    options.preset ?? (preset === EMPTY_SYSTEM_PRESET ? EMPTY_SYSTEM_PRESET : 'liangshen')
+  const systemPromptMode = resolveSystemPromptMode(expectedPreset, options.systemPrompt)
+  const bootstrap = [...(options.bootstrapTools ?? BOOTSTRAP_TOOLS)].sort()
   const firstHeader = firstRequestHeader(events)
   const checks = []
   const warnings = []
   const record = (name, ok, detail) => checks.push({ name, ok, detail })
 
-  const preset = effectivePreset(events)
   record('session header present', header !== undefined, header ? `created as preset=${header.agentPreset}, effective=${preset}` : 'no session header')
 
   if (header !== undefined) {
@@ -133,6 +166,7 @@ export function analyzeSession(events, options = {}) {
     return {
       sessionId: header?.id,
       preset,
+      systemPrompt: systemPromptMode,
       delegationDepth: header?.delegationDepth ?? 0,
       events: events.length,
       checks,
@@ -160,7 +194,17 @@ export function analyzeSession(events, options = {}) {
 
   const system = firstSystemMessage(events)
   const systemText = textOf(messageOf(system).content)
-  record('minimal persona is the first system prompt', systemText.includes(PERSONA_LINE), `system text starts: ${JSON.stringify(systemText.slice(0, 120))}`)
+  if (systemPromptMode === 'space') {
+    record(
+      'empty system prompt is a single space',
+      systemText === EMPTY_SYSTEM_PROMPT,
+      system === undefined
+        ? 'no system/message event in the session'
+        : `system text is ${JSON.stringify(systemText)} (expected exactly one ASCII space)`,
+    )
+  } else {
+    record('minimal persona is the first system prompt', systemText.includes(PERSONA_LINE), `system text starts: ${JSON.stringify(systemText.slice(0, 120))}`)
+  }
   record(
     'harness identity is absent from the first system prompt',
     !HARNESS_IDENTITY_MARKERS.some((marker) => systemText.includes(marker)),
@@ -221,6 +265,7 @@ export function analyzeSession(events, options = {}) {
   return {
     sessionId: header?.id,
     preset,
+    systemPrompt: systemPromptMode,
     delegationDepth: header?.delegationDepth ?? 0,
     events: events.length,
     checks,
@@ -245,16 +290,49 @@ export function newestSessionLog(root, filter = () => true) {
   return newest
 }
 
-function main(argv) {
+const USAGE =
+  'usage: node tools/verify-session.mjs <session.v4.jsonl.zstd> [--preset <preset-id>] [--system-prompt persona|space]'
+
+/** Parse the CLI: one session file plus optional preset / system-prompt flags. */
+function parseArgv(argv) {
   const args = argv.slice(2)
-  const file = args.find((arg) => !arg.startsWith('--'))
-  if (file === undefined) {
-    console.error('usage: node tools/verify-session.mjs <session.v4.jsonl.zstd> [--preset liangshen]')
+  const parsed = { file: undefined, preset: undefined, systemPrompt: undefined }
+  for (let i = 0; i < args.length; i += 1) {
+    const arg = args[i]
+    if (arg === '--preset' || arg === '--system-prompt') {
+      const value = args[i + 1]
+      if (value === undefined || value.startsWith('--')) return { error: `missing value for ${arg}` }
+      if (arg === '--preset') parsed.preset = value
+      else parsed.systemPrompt = value
+      i += 1
+    } else if (arg.startsWith('--')) {
+      return { error: `unknown option ${arg}` }
+    } else if (parsed.file === undefined) {
+      parsed.file = arg
+    } else {
+      return { error: `unexpected argument ${arg}` }
+    }
+  }
+  if (parsed.file === undefined) return { error: 'missing session file' }
+  if (parsed.systemPrompt !== undefined && !SYSTEM_PROMPT_MODES.has(parsed.systemPrompt)) {
+    return {
+      error: `unknown system prompt mode ${JSON.stringify(parsed.systemPrompt)}; expected persona or space`,
+    }
+  }
+  return parsed
+}
+
+function main(argv) {
+  const parsed = parseArgv(argv)
+  if (parsed.error !== undefined) {
+    console.error(`verify-session: ${parsed.error}`)
+    console.error(USAGE)
     process.exit(2)
   }
-  const presetIndex = args.indexOf('--preset')
-  const preset = presetIndex >= 0 ? args[presetIndex + 1] : 'liangshen'
-  const report = analyzeSession(decodeSessionFile(file), { preset })
+  const report = analyzeSession(decodeSessionFile(parsed.file), {
+    preset: parsed.preset,
+    systemPrompt: parsed.systemPrompt,
+  })
   console.log(JSON.stringify(report, null, 2))
   process.exit(report.failures.length === 0 ? 0 : 1)
 }

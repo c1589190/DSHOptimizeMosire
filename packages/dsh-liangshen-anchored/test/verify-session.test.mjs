@@ -10,6 +10,8 @@ import {
 const BOOTSTRAP = ['bash', 'str_replace_editor']
 const FULL = ['bash', 'str_replace_editor', 'read', 'write', 'edit', 'todo_write']
 const persona = 'You are a helpful software engineer assistant.'
+const EMPTY_PRESET = 'liangshen-empty-system'
+const EMPTY_SYSTEM_PROMPT = ' '
 
 const sessionHeader = (preset = 'liangshen', delegationDepth = 0) => ({
   type: 'session', version: 4, id: 'session-test', cwd: '/tmp', agentPreset: preset, delegationDepth,
@@ -39,6 +41,15 @@ function goodSession(overrides = {}) {
     requestHeader(8, overrides.reanchorTools ?? BOOTSTRAP),
     ...(overrides.extra ?? []),
   ]
+}
+
+/** A faithful empty-system session: same protocol, system prompt is one space. */
+function emptySystemSession(overrides = {}) {
+  return goodSession({
+    preset: EMPTY_PRESET,
+    systemText: EMPTY_SYSTEM_PROMPT,
+    ...overrides,
+  })
 }
 
 test('a faithful anchored session passes every check', () => {
@@ -122,4 +133,52 @@ test('concatenated zstd frames decode to all rows', () => {
 
 test('a corrupt frame prefix is rejected', () => {
   assert.throws(() => splitZstdFrames(Buffer.from([0, 1, 2, 3])), /bad zstd magic/)
+})
+
+test('an empty-system session auto-selects space mode and passes every check', () => {
+  const report = analyzeSession(emptySystemSession())
+  assert.equal(report.preset, EMPTY_PRESET)
+  assert.equal(report.systemPrompt, 'space')
+  assert.deepEqual(report.failures, [])
+  const emptyCheck = report.checks.find((check) => check.name === 'empty system prompt is a single space')
+  assert.equal(emptyCheck?.ok, true)
+  assert.equal(emptyCheck?.detail, 'system text is " " (expected exactly one ASCII space)')
+  assert.equal(
+    report.checks.find((check) => check.name === 'harness identity is absent from the first system prompt')?.ok,
+    true,
+  )
+})
+
+test('empty-system events analyzed as the persona preset do not pass', () => {
+  const report = analyzeSession(emptySystemSession(), { preset: 'liangshen' })
+  assert.equal(report.systemPrompt, 'persona')
+  assert.notDeepEqual(report.failures, [])
+  assert.match(report.failures.join('\n'), /minimal persona is the first system prompt/)
+  // Persona mode must not silently accept the empty variant via the space check.
+  assert.ok(report.checks.every((check) => check.name !== 'empty system prompt is a single space'))
+  assert.equal(report.checks.find((check) => check.name === 'minimal persona is the first system prompt')?.ok, false)
+})
+
+test('a persona session analyzed with the space override fails the single-space check', () => {
+  const report = analyzeSession(goodSession(), { systemPrompt: 'space' })
+  assert.equal(report.systemPrompt, 'space')
+  assert.notDeepEqual(report.failures, [])
+  assert.match(report.failures.join('\n'), /empty system prompt is a single space/)
+  assert.ok(report.failures.every((failure) => !failure.startsWith('minimal persona')))
+})
+
+test('a trimmed (empty-string) system prompt fails the single-space check (D1 deviation)', () => {
+  // The adapter trims a lone space to '' in the real wire; the verifier asserts
+  // the documented D1 behaviour explicitly instead of quietly widening to <= 1.
+  const report = analyzeSession(emptySystemSession({ systemText: '' }))
+  assert.notDeepEqual(report.failures, [])
+  assert.match(report.failures.join('\n'), /empty system prompt is a single space/)
+  assert.match(report.failures.join('\n'), /system text is ""/)
+})
+
+test('an unknown system prompt mode is rejected instead of silently passing', () => {
+  assert.throws(
+    () => analyzeSession(emptySystemSession(), { systemPrompt: 'none' }),
+    /unknown system prompt mode "none"; expected persona or space/,
+  )
 })

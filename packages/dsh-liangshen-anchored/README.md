@@ -3,6 +3,13 @@
 「梁神模式（锚定式）」的现代复刻：把社区已停用的 **anchored standard** 梁神预设，以官方
 `@deepseek-ai/dsh-agent-preset` 声明机制重新装回 DSH Web profile。
 
+本 bundle 声明**两个预设**：
+
+| 预设 id | 名称 | 说明 |
+|---|---|---|
+| `liangshen` | 梁神模式 | 锚定式主预设（order 5） |
+| `liangshen-empty-system` | 梁神模式·空系统提示词 | 与主预设完全一致，仅系统提示词替换为**单个 ASCII 空格**（order 6，对照用） |
+
 ## 它做什么
 
 1. **首轮锚定**：新会话第一条模型请求只暴露官方 Minimal 精确双工具
@@ -16,6 +23,14 @@
 系统提示词与官方 Minimal 逐字节一致（单行 persona），AGENTS.md 不在首轮注入；
 晋升后由 `instruction-hint` 注入一条非命令式提示，模型自己读文件。
 
+空系统提示词变体的组合由 `tools/sync-preset-variant.mjs` 从主组合生成（唯一差异为 persona 字面量，
+单测会拦截产物过期）。生成/校验：
+
+```sh
+node tools/sync-preset-variant.mjs           # 校验产物是否最新
+node tools/sync-preset-variant.mjs --write   # 主组合改动后重新生成
+```
+
 ## 安装（Web profile）
 
 ```sh
@@ -25,7 +40,7 @@ node tools/link-dsh-peers.mjs
 dsh plugin --profile web add link:/home/cna/DSHOptimizeMosire/packages/dsh-liangshen-anchored
 ```
 
-装完新开会话，在预设选择器里选「梁神模式」。
+装完新开会话，在预设选择器里选「梁神模式」或「梁神模式·空系统提示词」。
 
 > 为什么要 symlink：组合 YAML 由 `@deepseek-ai/cordis-plugin-include` 从包内目录加载，
 > 其中的 `@deepseek-ai/*` 裸包名由 Node 从该目录向上找 `node_modules`；workspace 包没有自己的依赖树，
@@ -37,8 +52,10 @@ dsh plugin --profile web add link:/home/cna/DSHOptimizeMosire/packages/dsh-liang
 ```
 cordis.patch.yml                  # 插入 preset-liangshen 声明
 presets/liangshen/
-  preset.yml                      # 名称/order 元数据
+  preset.yml                      # 主预设名称/order 元数据
+  preset.empty-system.yml         # 空系统提示词变体元数据（order 6）
   agent.cordis.yml                # 21 行组合（context-gate 首行）
+  agent.empty-system.cordis.yml   # 生成的空提示词组合（勿手改）
   tool-bootstrap.mjs              # 首轮收窄 + 晋升（v7）
   context-gate.mjs                # 统一注入控制（上游）
   instruction-hint.mjs            # 晋升后一条指令文件提示
@@ -46,8 +63,8 @@ presets/liangshen/
   custom-bash.mjs                 # Windows Git Bash 等价 bash
   compaction-epoch.mjs            # 晋升纪元（压缩感知）
   session-events.mjs
-test/                             # node --test（25 条）
-lib/index.js                      # 合法占位（manifest 导出目标）
+test/                             # node --test（组合/纪元/verifier/后台任务）
+lib/index.js                      # host 插件：激活时声明两个预设 + 诊断状态文件
 ```
 
 ## 验证
@@ -56,6 +73,8 @@ lib/index.js                      # 合法占位（manifest 导出目标）
 cd packages/dsh-liangshen-anchored && node --test test/*.test.mjs
 # 真实会话协议断言：
 node ../../tools/verify-session.mjs <session.v4.jsonl.zstd> --preset liangshen
+# 空系统提示词变体（期望首条 system message 恰好为一个空格）：
+node ../../tools/verify-session.mjs <session.v4.jsonl.zstd> --preset liangshen-empty-system
 ```
 
 ## 许可
