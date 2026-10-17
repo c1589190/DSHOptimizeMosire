@@ -41,16 +41,16 @@
       `space` 模式检查「system === ' '」与「无 harness identity」。
 - [x] Step 3: 测试 PASS。
 
-## Task 4: 安装 + 真实 wire 验证（待 DSH 重启）
+## Task 4: 安装 + 真实 wire 验证（已完成，DSH 重启后实机）
 
-- [ ] Step 1: `plugin_manager install_bundle …/packages/dsh-liangshen-anchored` 重装 → 状态文件两预设 `broken:null`。
-- [ ] Step 2: 请用户新建 Web 会话选「梁神模式·空系统提示词」跑一次 bash 任务；取会话日志跑
+- [x] Step 1: `plugin_manager install_bundle …/packages/dsh-liangshen-anchored` 重装 → 状态文件两预设 `broken:null`。
+- [x] Step 2: 请用户新建 Web 会话选「梁神模式·空系统提示词」跑一次 bash 任务；取会话日志跑
       `node tools/verify-session.mjs <path> --preset liangshen-empty-system`。
-- [ ] Step 3: 同日跑主预设真实会话回归（B4）；证据归档 `.superpowers/sdd/2026-10-17-empty-system/`。
-- [ ] Step 4: 若 wire 中空格被 trim（D1），记录实测文本与偏差，回报用户，不擅自改判据。
+- [x] Step 3: 同日跑主预设真实会话回归（B4）；证据归档 `.superpowers/sdd/2026-10-17-empty-system/`。
+- [x] Step 4: D1 未触发——wire 中 system 文本就是恰好一个空格（无 trim 偏差，已记 evidence/real-wire.md）。
 
 ## Task 5: 收尾
 
-- [ ] Step 1: 全量测试 + `node --check`。
-- [ ] Step 2: 更新状态文档/AGENTS 门禁；`git status` 自查。
-- [ ] Step 3: commit + push（用户已授权本阶段）。
+- [x] Step 1: 全量测试 + `node --check`。
+- [x] Step 2: 更新状态文档/AGENTS 门禁；`git status` 自查。
+- [x] Step 3: commit + push（用户已授权本阶段）。

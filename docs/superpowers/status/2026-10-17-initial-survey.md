@@ -142,3 +142,18 @@
 
 ### 仓库
 - 本轮提交（features 3 + 4 + docs）随 2026-10-17 深夜提交推送。
+
+## 十、收尾验证（2026-10-17 深夜 · DSH 重启后）
+
+- **功能四 A1 通过**：用户重启 DSH（host pid 853 → 14417）→ 新 host 插件代码加载。
+  `~/.dsh/liangshen-anchored-status.json`（schema v2）：`liangshen` 与 `liangshen-empty-system` 均 `declared:true`、`broken:null`。
+- **功能四真实 wire 通过**（用户新建会话 `session-c57e32e7…`，workspace /home/cna/tp/1，选「梁神模式·空系统提示词」后发「说话」）：
+  `node tools/verify-session.mjs <session> --preset liangshen-empty-system` → **exit=0，failures: []**：
+  首请求 `[bash, str_replace_editor]`、首步零自动注入、首条 system message **恰好一个 ASCII 空格**、
+  首个持久信号后晋升 **48 工具**（= 原 45 + 本次安装的 subagent-access 3 工具）；compaction re-anchor 因该会话未压缩 → skipped。
+  无 `--preset` 的自动模式同样 exit=0。证据：`.superpowers/sdd/2026-10-17-empty-system/evidence/real-wire.md`。
+- **功能一回归**：T3 主预设真实会话（`session-d3ee6e14…`）`--preset liangshen` 仍 `failures: []`。
+  这也证明安装 subagent-access 后 `liangshen` **首轮锚定 wire 未变**（只影响晋升后的工具面 45→48，铁律 2 实机证据）。
+- **功能三**：重启后 subagent-access（pid 14417）重新激活，三工具在工具面。
+- 剩余未验：功能四的**空预设压缩重锚**（需在该会话 `/compact`）、功能二的三条未测路径（30s 超时/关闭卡片/后台无浏览器）、
+  功能一 E1/F1/H、功能三 M2 实验。

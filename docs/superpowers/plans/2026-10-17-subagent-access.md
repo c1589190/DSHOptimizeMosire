@@ -61,6 +61,6 @@
 
 ## Task 5: 收尾
 
-- [ ] Step 1: 全量测试（三个包）+ `node --check`。
+- [x] Step 1: 全量测试（三个包）+ `node --check`。
 - [x] Step 2: 更新状态文档/AGENTS 门禁；`git status` 自查。
 - [x] Step 3: commit + push（用户已授权本阶段）。
