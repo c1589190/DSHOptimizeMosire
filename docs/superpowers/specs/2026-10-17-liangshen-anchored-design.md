@@ -211,3 +211,17 @@ promoteSignal = tool/call | assistant/message   (promoteOn: either)
 > 「起因是，我目前使用了比较长时间的dsh，但是效果参差不齐，偶然想到之前有一个被删掉的梁神模式貌似挺好用，你先搜索一下相关资料——这个项目就是要复刻一下这个模式，同时做一些功能上的优化，先调查、创建AGENTS.md，本项目通用上下文的规则可以参考隔壁~/SimualtorMosire的结构」
 
 裁定（用户选择）：D-001=A 锚定式 v7 保真复刻；D-002=A Web profile 插件 bundle；D-003=B 复刻 + 上游小改进；D-006 随 D-003（基线=v7，吸收 `promoteOn: either`/`context-gate`/Windows 后台任务）；D-004 默认沿用「梁神模式」/order 5/MIT；D-005 默认协议级 smoke + 12 会话小矩阵。
+
+## 12. 追加设计（2026-10-17 深夜，D-010）：子 Agent 模型/档位选择
+
+> 用户原话：「可不可以自定义子Agent的思考档位？」→ 方案确认后：「加上，默认档位选择high」。
+
+- `tool-subagent`（spawn）行配置：`modelSelectionSettings: true` + `agentOptions: { reasoningEffort: high }`；
+  空系统提示词变体由生成器继承同样配置（组合一致性测试覆盖）。
+- 工具面变化（仅**新会话**）：`subagent` 增加可选 `provider` / `model` / `reasoning_effort`，并出现
+  `list_subagent_models`；不给这些参数时子 Agent 的思考档位默认 `high`（父路由继承、provider=spawn）。
+- 约束：需要 Host `subagent-model-selection` 设置启用（Web profile 自带该 service；用户已开启）；
+  策略按会话创建时记录，旧会话不追溯；`subagent_fork`/Team 仍不支持；显式选择必须落在允许路由内，
+  只调档位时须把父路由勾进允许列表。
+- 验证：单测 59/59（含组合断言：`modelSelectionSettings: true` + `agentOptions.reasoningEffort: high`）；
+  重挂载后两预设 `broken:null`（配置被接受）。真实「新会话换档位派单」wire 验证待下一次新会话。

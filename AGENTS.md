@@ -115,7 +115,7 @@
 ## 七、已裁定与当前门禁
 
 **功能一（梁神模式复刻）**：D-001=A 锚定式 v7 保真复刻；D-002=A Web profile 插件 bundle；D-003=B 复刻 + 上游小改进；
-D-004=沿用「梁神模式」/ order 5 / MIT；D-005=协议级 smoke + 12 会话小矩阵；D-006=基线本地 v7 + 吸收 `promoteOn: either` / `context-gate` / Windows 后台任务。
+D-004=沿用「梁神模式」/ order 5 / MIT；D-005=协议级 smoke + 12 会话小矩阵；D-006=基线本地 v7 + 吸收 `promoteOn: either` / `context-gate` / Windows 后台任务；D-010（2026-10-17）=子 Agent 支持按次模型/档位选择（`modelSelectionSettings: true`），默认档位 `high`（主预设与空提示词变体同配）。
 
 **功能二（goal 续轮确认门）**：G-001=A 官方提问卡片；G-002=A 全局挂载；G-003=A 关闭卡片=取消并删 goal；G-004=A 独立 bundle。
 
@@ -134,5 +134,7 @@ D-008=生成器（`tools/sync-preset-variant.mjs`）+ 提交产物、单测防�
    M2 锚定语义实验未开始）；
    功能四 **A1+B1/B2/B3 已实机验证**（用户重启 DSH 后：两预设 `broken:null`；新会话 `session-c57e32e7…` 选空预设，
    verifier exit=0：system 恰好一个空格、首请求双工具、零注入、晋升 48 工具）；仅空预设的**压缩重锚**未验（需 /compact）。
+   功能一追补 **D-010**：liangshen 两预设的 `tool-subagent` 行已开 `modelSelectionSettings: true` + `agentOptions.reasoningEffort: high`，
+   重挂载后 `broken:null`；真实「新会话按次换模型/档位」wire 待新会话验证（旧会话不追溯）。
 3. 任何新增「待裁定」先做口径溯源并落盘，已有裁定不重复问（见 `docs/AGENTS.md` §二）。
 4. 用户 2026-10-17 已授权本阶段 `git commit` + push 到 `git@github.com:c1589190/DSHOptimizeMosire.git`（main）。

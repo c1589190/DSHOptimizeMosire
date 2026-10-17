@@ -378,6 +378,15 @@
         provider: spawn
         toolName: subagent
         backgroundMode: continuable
+        # Per-call child LLM route + reasoning effort selection (needs the Host
+        # `subagent-model-selection` setting enabled AND a new session: the
+        # policy is recorded when a session is created). `high` is the default
+        # reasoning effort for delegated children of this preset; a call may
+        # still override provider/model/reasoning_effort within the allowed
+        # routes. `subagent_fork` keeps inheriting the parent route by design.
+        modelSelectionSettings: true
+        agentOptions:
+          reasoningEffort: high
 
     - id: tool-subagent-fork
       name: '@deepseek-ai/dsh-tool-subagent'

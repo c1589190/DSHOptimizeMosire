@@ -43,3 +43,19 @@
 - 裁定后：brainstorming 设计 → `docs/superpowers/specs/` 设计书 → 用户评审 → `writing-plans` → 实现；
 - 若 D-001 选 C：issue #266 的双分支需要「按首轮实际 route 判定」的实现，先做单分支保真版再外挂；
 - 若 D-002 选 A：需要额外设计设置卡/`!!js` 版本兼容与 bundle 安装路径（plugin_manager）。
+
+## 追加裁定 D-010（2026-10-17 深夜）
+
+用户原话：「加上，默认档位选择high」（承接「可不可以自定义子Agent的思考档位」→ 方案 2：把默认档位写进预设）。
+
+- **D-010 = 梁神预设的子 Agent 支持按次模型/档位选择，默认档位 `high`**：
+  - `presets/liangshen/agent.cordis.yml` 的 `tool-subagent` 行加 `modelSelectionSettings: true` 与
+    `agentOptions: { reasoningEffort: high }`；
+  - 生成器同步 `agent.empty-system.cordis.yml`（空提示词变体继承同样配置）；
+  - 效果：`liangshen` / `liangshen-empty-system` 的新会话里，`subagent` 工具（spawn）多出
+    `provider` / `model` / `reasoning_effort` 三个可选参数与 `list_subagent_models` 发现工具；
+    不给参数时子 Agent 默认思考档位 = `high`；
+  - 生效前提：Host `subagent-model-selection` 设置已启用并含允许路由（用户已开）；策略在**会话创建时**记录，
+    旧会话不追溯；`subagent_fork` 与 Team 的 `spawn_teammate` 仍不支持选择（上游设计）。
+  - 实测：`high` 是 deepseek 模型广告档位之一（`off/low/high/max`，`high` 描述 "default balance for most tasks"，
+    `dsh-llm-deepseek/lib/index.js:453-477`）；预设重挂载后 `broken:null`（配置被接受）。

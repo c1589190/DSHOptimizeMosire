@@ -23,6 +23,12 @@
 系统提示词与官方 Minimal 逐字节一致（单行 persona），AGENTS.md 不在首轮注入；
 晋升后由 `instruction-hint` 注入一条非命令式提示，模型自己读文件。
 
+子 Agent 的模型/档位：`tool-subagent` 行开启 `modelSelectionSettings: true` 并设
+`agentOptions.reasoningEffort: high`——在新会话里 `subagent` 工具可选 `provider` / `model` / `reasoning_effort`
+（`list_subagent_models` 查目录），不给参数时子 Agent 默认思考档位 `high`。前提：Host 的
+`subagent-model-selection` 设置已启用（Web profile 自带），且策略在会话创建时记录（旧会话不追溯）。
+`subagent_fork` 固定继承父模型，不支持选择。
+
 空系统提示词变体的组合由 `tools/sync-preset-variant.mjs` 从主组合生成（唯一差异为 persona 字面量，
 单测会拦截产物过期）。生成/校验：
 

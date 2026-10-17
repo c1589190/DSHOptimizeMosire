@@ -157,3 +157,13 @@
 - **功能三**：重启后 subagent-access（pid 14417）重新激活，三工具在工具面。
 - 剩余未验：功能四的**空预设压缩重锚**（需在该会话 `/compact`）、功能二的三条未测路径（30s 超时/关闭卡片/后台无浏览器）、
   功能一 E1/F1/H、功能三 M2 实验。
+
+## 十一、追加：子 Agent 模型/思考档位选择（2026-10-17 深夜，D-010）
+
+- 用户已开启 GUI「Subagent → Model selection」并确认「默认档位选择 high」。
+- 改动：`presets/liangshen/agent.cordis.yml` 的 `tool-subagent` 行加 `modelSelectionSettings: true` +
+  `agentOptions: { reasoningEffort: high }`；生成器同步空提示词变体（两组合一致性测试覆盖）。
+- 效果（新会话）：`subagent`（spawn）可选 `provider` / `model` / `reasoning_effort`，并新增 `list_subagent_models`；
+  不传参数时子 Agent 默认思考档位 `high`。旧会话不追溯（策略在会话创建时记录）；fork/Team 不支持。
+- 本机验证：单测 59/59；`high` 为 deepseek 模型广告档位（off/low/high/max）；bundle 关/开重挂载后两预设 `broken:null`
+  （配置被接受）。**真实「新会话换档位派单」wire 待验**：需新建 liangshen/空预设会话后检查工具面并实际派单。
