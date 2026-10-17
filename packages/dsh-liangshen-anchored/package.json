@@ -1,0 +1,22 @@
+{
+  "name": "@mosire/dsh-liangshen-anchored",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Anchored LiangShen mode preset (faithful port of the community anchored-standard design) for DeepSeek Harness Web profiles.",
+  "exports": {
+    ".": "./lib/index.js",
+    "./package.json": "./package.json"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/dsh": ">=0.2.0-rc.2"
+  },
+  "dsh": {
+    "engines": {
+      "dsh": ">=0.2.0-rc.2"
+    },
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  }
+}
