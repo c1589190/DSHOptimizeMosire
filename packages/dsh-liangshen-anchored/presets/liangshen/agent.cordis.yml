@@ -34,6 +34,12 @@
 # message into the next request: minimal first round, injections on the second
 # round. A `compaction/end` boundary re-closes the gate the same way.
 #
+# ONE deliberate exception (feature 5, D-013): the per-compaction `recovery-hint`
+# message is allow-listed below, so the gated FIRST post-compaction request
+# carries exactly that one hint while the tool surface stays the Minimal pair.
+# The model therefore learns to restore AGENTS.md/skill context before it acts
+# on the compacted history. Initial first-round wire (boundary -1) is unchanged.
+#
 # This row deliberately sits before every other row: waterfall after-next
 # transforms apply in reverse registration order, so registering first (plus
 # the empty inject list and the pre-step listener's `prepend` flag) makes the
@@ -49,7 +55,9 @@
   config:
     promoteOn: either
     includeSubagents: true
-    allowKinds: [skill-invocation]
+    # `recovery-hint` is the only non-skill kind allowed through the closed gate
+    # (feature 5): it re-orients the model on the first post-compaction request.
+    allowKinds: [skill-invocation, recovery-hint]
 
 # ── bootstrap (must stay after the context gate) ─────────────────────────────────────────────
 
@@ -130,11 +138,23 @@
 # ONE short hint is injected once per session — "these instruction files
 # exist; read them before acting" — and the model reads the files itself via
 # the filesystem tools when relevant.
+#
+# RECOVERY (feature 5, D-011~D-014): a compaction rewrites the visible surface,
+# so the session loses that hint (and whatever the model read). After EVERY
+# `compaction/end` the plugin injects one additional recovery hint — even while
+# the new epoch is still unpromoted — telling the model to re-read the
+# instruction files (locating the repository root when the workspace lives
+# elsewhere), recover the status/handoff document AGENTS.md points at, and
+# rediscover skills with skill_search / skill_load. It is deduped per boundary
+# and by durable events (resume-safe) and uses the allow-listed
+# `source.kind = 'recovery-hint'`. `recoveryHint: false` restores the old
+# once-per-session behavior.
 - id: instruction-hint
   name: ./instruction-hint.mjs
   config:
     promoteOn: either
     includeSubagents: true
+    recoveryHint: true
 
 # ── shell ───────────────────────────────────────────────────────────────────
 

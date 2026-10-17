@@ -38,6 +38,16 @@ test('bootstrap keeps the Minimal tool pair and the inline suppression set', () 
   assert.match(yml, /suppressedContextSources: \[agent-instructions, skill-catalog\]/)
 })
 
+test('the context gate allows the per-compaction recovery hint', () => {
+  assert.match(yml, /allowKinds: \[skill-invocation, recovery-hint\]/u)
+  assert.match(variantYml, /allowKinds: \[skill-invocation, recovery-hint\]/u)
+})
+
+test('instruction-hint enables the per-compaction recovery hint in both presets', () => {
+  assert.match(yml, /recoveryHint: true/u)
+  assert.match(variantYml, /recoveryHint: true/u)
+})
+
 const localPluginFiles = (composition) =>
   [...composition.matchAll(/name: \.\/([\w-]+\.mjs)/g)].map((match) => match[1])
 

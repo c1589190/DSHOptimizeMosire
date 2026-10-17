@@ -27,6 +27,10 @@ const requestHeader = (seq, tools) => ({
   type: 'request/header', seq, data: { header: { tools: tools.map((name) => ({ name })) }, reason: 'initial' },
 })
 const signal = (seq, type = 'tool/call') => ({ type, seq })
+const recoveryHint = (seq, boundary) => ({
+  type: 'user/message', seq,
+  data: { message: { role: 'user', source: { kind: 'recovery-hint', form: 'hint', boundary }, content: [] } },
+})
 const selection = (seq, preset) => ({ type: 'agent-preset/selected', seq, data: { agentPreset: preset } })
 
 function goodSession(overrides = {}) {
@@ -38,7 +42,8 @@ function goodSession(overrides = {}) {
     signal(5),
     requestHeader(6, overrides.promotedTools ?? FULL),
     { type: 'compaction/end', seq: 7 },
-    requestHeader(8, overrides.reanchorTools ?? BOOTSTRAP),
+    recoveryHint(8, 7),
+    requestHeader(9, overrides.reanchorTools ?? BOOTSTRAP),
     ...(overrides.extra ?? []),
   ]
 }
@@ -79,6 +84,27 @@ test('harness identity in the system prompt fails the minimal prompt check', () 
 test('a promoted request that stays at the bootstrap pair fails', () => {
   const report = analyzeSession(goodSession({ promotedTools: BOOTSTRAP }))
   assert.match(report.failures.join('\n'), /promotion widens/)
+})
+
+test('a post-compaction session without the recovery hint fails', () => {
+  const events = goodSession()
+  const index = events.findIndex(
+    (event) => event.type === 'user/message' && event.data?.message?.source?.kind === 'recovery-hint',
+  )
+  assert.ok(index >= 0, 'fixture must contain a recovery hint')
+  events.splice(index, 1)
+  const report = analyzeSession(events)
+  assert.match(report.failures.join('\n'), /compaction recovery hint/)
+})
+
+test('a recovery hint for the wrong boundary does not satisfy the check', () => {
+  const events = goodSession()
+  const index = events.findIndex(
+    (event) => event.type === 'user/message' && event.data?.message?.source?.kind === 'recovery-hint',
+  )
+  events[index] = recoveryHint(8, 6)
+  const report = analyzeSession(events)
+  assert.match(report.failures.join('\n'), /compaction recovery hint/)
 })
 
 test('a post-compaction request that stays wide fails re-anchor', () => {

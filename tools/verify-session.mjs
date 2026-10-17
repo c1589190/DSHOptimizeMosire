@@ -252,6 +252,29 @@ export function analyzeSession(events, options = {}) {
     )
   }
 
+  // Feature 5: the first post-compaction request must carry exactly one
+  // recovery hint (source.kind='recovery-hint', boundary = compaction/end seq),
+  // injected even though that request is still in the gated (unpromoted) phase.
+  for (const boundary of boundaries) {
+    const nextHeader = events.find((event) => event.type === 'request/header' && event.seq > boundary.seq)
+    if (nextHeader === undefined) {
+      checks.push({ name: 'compaction recovery hint', ok: true, detail: `skipped: no request after compaction@${boundary.seq}`, skipped: true })
+      continue
+    }
+    const hint = events.find((event) => {
+      if (event.type !== 'user/message' || event.seq <= boundary.seq || event.seq >= nextHeader.seq) return false
+      const source = messageOf(event).source ?? event.data?.source
+      return source?.kind === 'recovery-hint' && source.boundary === boundary.seq
+    })
+    record(
+      'compaction recovery hint',
+      hint !== undefined,
+      hint === undefined
+        ? `compaction@${boundary.seq}: no recovery-hint before request@${nextHeader.seq}`
+        : `compaction@${boundary.seq} → recovery-hint@${hint.seq} → request@${nextHeader.seq}`,
+    )
+  }
+
   // Subagents must follow the same anchor when includeSubagents is enabled.
   if ((header?.delegationDepth ?? 0) > 0) {
     record(

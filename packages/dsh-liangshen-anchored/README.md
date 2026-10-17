@@ -19,9 +19,13 @@
    之后，下一条请求放开完整组装目录。
 3. **压缩重锚**：`compaction/end` 之后 epoch 感知地回到受控态，等新的持久信号再晋升。
 4. **子代理同相位**：`includeSubagents: true`，子代理首轮同样锚定。
+5. **压缩后恢复 hint**（功能五）：每个 `compaction/end` 后的第一条请求额外注入一条恢复提示——
+   重读 AGENTS.md/CLAUDE.md（必要时先定位仓库根）、按 AGENTS.md 索引恢复 status/handoff、
+   用 `skill_search`/`skill_load` 恢复技能环境。每个压缩纪元仅一次、按 boundary 与 durable 事件去重（resume 安全）；
+   该消息经 `context-gate.allowKinds` 放行，压缩后首请求工具面仍是 Minimal 双工具；`recoveryHint: false` 可关闭。
 
 系统提示词与官方 Minimal 逐字节一致（单行 persona），AGENTS.md 不在首轮注入；
-晋升后由 `instruction-hint` 注入一条非命令式提示，模型自己读文件。
+晋升后由 `instruction-hint` 注入一条非命令式提示，模型自己读文件，压缩后再补一条恢复提示。
 
 子 Agent 的模型/档位：`tool-subagent` 行开启 `modelSelectionSettings: true` 并设
 `agentOptions.reasoningEffort: high`——在新会话里 `subagent` 工具可选 `provider` / `model` / `reasoning_effort`
@@ -64,7 +68,7 @@ presets/liangshen/
   agent.empty-system.cordis.yml   # 生成的空提示词组合（勿手改）
   tool-bootstrap.mjs              # 首轮收窄 + 晋升（v7）
   context-gate.mjs                # 统一注入控制（上游）
-  instruction-hint.mjs            # 晋升后一条指令文件提示
+  instruction-hint.mjs            # 晋升后一条指令提示 + 每个压缩纪元一条恢复提示
   skill-search.mjs                # 按需 skill 检索（替代全量目录注入）
   custom-bash.mjs                 # Windows Git Bash 等价 bash
   compaction-epoch.mjs            # 晋升纪元（压缩感知）
