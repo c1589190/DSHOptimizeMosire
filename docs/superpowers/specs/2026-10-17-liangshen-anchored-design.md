@@ -22,7 +22,7 @@
 | A1 | `plugin_manager install_bundle` 安装本包后，preset 行 `preset-liangshen` 激活**无 diagnostic** | `plugin_manager list_plugins` + `cordis_inspect_query Config.listConfigs` |
 | A2 | 新建会话的预设选择器出现「梁神模式」（name/order 正确） | 真实 Web 新建会话页 |
 | B1 | 新会话**第一条**模型请求工具面恰为 `bash` + `str_replace_editor`（无其它工具） | 会话 JSONL `request/header`（首条，`reason` 属 initial/series） |
-| B2 | 首轮 system prompt = persona 块（一行 persona + 工作纪律 + `Your working directory is <cwd>.`；plan mode 时另加 `plan:policy`） | 会话 JSONL `system/message` / header 对应事件 |
+| B2 | 首轮 system prompt = 与官方 Minimal 逐字节一致的 persona 块（v7 实现为单行 `You are a helpful software engineer assistant.`；无 harness identity / 无工作纪律 / 无 cwd 追加行——「工作纪律 + cwd」是 dsh-web 版实现，不在本轮复刻范围；plan mode 时另加 `plan:policy`） | 会话 JSONL `system/message` |
 | B3 | 首个 step **不含** `skill-catalog` / `agent-instructions` 自动注入消息（context-gate 开启后：任何自动注入都被关闭） | 会话 JSONL 首 step 的 message source 清单 |
 | C1 | 首个持久工具调用之后的下一条请求工具面 = 完整组装目录（数量 > 2，且包含 fs/jobs/skill/goal/todo/ask-user/web/subagent 等） | 会话 JSONL 第二条 `request/header` |
 | D1 | `/compact`（或自动压缩）后的下一条请求重新收窄为 bootstrap 双工具；新的持久信号后再次放开 | 真实会话 + `/compact` + JSONL 断言 |
