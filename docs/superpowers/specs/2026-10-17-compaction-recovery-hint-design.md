@@ -127,7 +127,13 @@ on agent/pre-step(agent, next):
 - **回滚**：`recoveryHint: false`（配置）或移除 `allowKinds` 中的 `recovery-hint`。
 - 不追溯旧会话；只对改动后新建（或之后发生压缩）的会话生效。
 
-## 八、未做 / 未验证（实现前）
+## 八、实现与实机结果（2026-10-17 深夜）
 
-- 尚未改代码/组合；真实 `/compact` 行为、模型是否照 hint 重读 AGENTS.md 均未实测。
-- 老会话不追溯；D-016（complete 缺口）不在本轮。
+- 已实现并推送（`6ae5cb6`）：`instruction-hint.mjs` epoch 感知 recovery 分支；`context-gate.allowKinds` 加 `recovery-hint`；
+  空预设生成器同步；`tools/verify-session.mjs` 新增「compaction recovery hint」检查；单测 liangshen 76/76（goal-confirm 30/30、subagent-access 28/28）。
+- **实机通过**（DSH 重启后 host pid 180597；用户会话 `session-aa65c681…`，effective `liangshen`）：
+  首轮 tools=2/零注入；初始 hint@31 → 模型 `cat AGENTS.md`@36；`/compact` → `compaction/end`@104 →
+  **recovery-hint@111（boundary=104）** → 压缩后首请求@112 **tools=2** → 模型 `cat AGENTS.md`@116 → 再晋升@122 tools=48；
+  `verify-session` exit=0，failures=[]。证据见 `.superpowers/sdd/2026-10-17-compaction-recovery-hint/evidence/e2e-live.md`（本机留痕，不进 git）。
+- 未验证：空预设未单独跑 recovery 实机（同源插件/组合 + 生成器 + 单测覆盖）；旧会话不追溯；D-016（complete 缺口）不在本轮；
+  D-015 升级条件（若 hint 仍被忽略 → 带内容版）保留为后备。

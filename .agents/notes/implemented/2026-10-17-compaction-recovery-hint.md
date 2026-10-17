@@ -27,3 +27,9 @@
 
 - 调研：`docs/agents/04-调研-通用基础设施补位.md`（§3.1 故障链、§4.0 上游历史）。
 - 实机证据（待补）：`.superpowers/sdd/2026-10-17-compaction-recovery-hint/evidence/`。
+
+## 实机结果（2026-10-17 深夜）
+
+- DSH 重启后用户会话 `session-aa65c681…`（effective liangshen）：`compaction/end`@104 → `recovery-hint`@111（boundary=104，483 chars）
+  → 压缩后首请求@112 tools=2 → 模型 `cat AGENTS.md`@116 → 再晋升@122 tools=48；`verify-session` exit=0（含新检查）。
+- 提交：`831d059`（docs）、`6ae5cb6`（feat），远程 main；空预设未单独跑 recovery（同源+单测覆盖）。

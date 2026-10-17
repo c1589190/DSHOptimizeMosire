@@ -29,16 +29,16 @@
 - [x] `tools/verify-session.mjs`：每个 `compaction/end` 后检查 recovery-hint（boundary 匹配）+ 报告字段
 - [x] 全量测试（liangshen 59+新增、goal-confirm 30、subagent-access 28）
 
-## T4 实机（需用户配合，阻塞于重启）
+## T4 实机（完成：主预设；空预设未单独跑）
 
-- [ ] 提交+推送代码
-- [ ] 用户重启 DSH → 新会话（主预设）跑一次真实任务 → `/compact` → 继续工作
-- [ ] 同一流程跑空预设会话
-- [ ] 用 `tools/verify-session.mjs` 分析两份日志：首轮 2 工具/零注入、压缩后 recovery-hint、工具面、模型是否 read AGENTS.md
-- [ ] 证据落 `.superpowers/sdd/2026-10-17-compaction-recovery-hint/evidence/`
+- [x] 提交+推送代码 — `6ae5cb6`（远程 main）
+- [x] 用户重启 DSH → 新会话（主预设）跑一次真实任务 → `/compact` → 继续工作
+- [ ] 同一流程跑空预设会话（未单独执行：插件/组合同源 + 生成器 + 单测覆盖）
+- [x] 用 `tools/verify-session.mjs` 分析日志：首轮 2 工具/零注入、压缩后 recovery-hint@111、压缩后首请求 tools=2、模型 read AGENTS.md@116（主预设会话）
+- [x] 证据落 `.superpowers/sdd/2026-10-17-compaction-recovery-hint/evidence/`（e2e-live.md / verify-session.json / timeline.txt / 会话副本）
 
-## T5 收尾
+## T5 收尾（本 commit）
 
-- [ ] `docs/superpowers/status/2026-10-17-initial-survey.md` 追加功能五进度
-- [ ] README 提及压缩恢复 hint
+- [x] `docs/superpowers/status/2026-10-17-initial-survey.md` 追加功能五进度
+- [x] README 提及压缩恢复 hint
 - [ ] 最终 commit + push

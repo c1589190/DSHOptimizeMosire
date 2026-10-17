@@ -167,3 +167,21 @@
   不传参数时子 Agent 默认思考档位 `high`。旧会话不追溯（策略在会话创建时记录）；fork/Team 不支持。
 - 本机验证：单测 59/59；`high` 为 deepseek 模型广告档位（off/low/high/max）；bundle 关/开重挂载后两预设 `broken:null`
   （配置被接受）。**真实「新会话换档位派单」wire 待验**：需新建 liangshen/空预设会话后检查工具面并实际派单。
+
+## 十二、功能五：压缩后恢复 hint（2026-10-17 深夜，D-011~D-014）
+
+- **裁定**（用户「开始吧」）：压缩后**额外注入一条纯提示 recovery hint**（不注入 AGENTS 内容、不回挂官方注入源）；
+  主预设 + 空预设都启用；时机 = 压缩后的第一条请求（工具面仍 2 工具，经 `context-gate.allowKinds` 放行）。
+- **设计/计划**：`docs/superpowers/specs/2026-10-17-compaction-recovery-hint-design.md`、
+  `docs/superpowers/plans/2026-10-17-compaction-recovery-hint.md`、决策记录 `.agents/notes/implemented/2026-10-17-compaction-recovery-hint.md`。
+- **实现**：`instruction-hint.mjs` 增加 epoch 感知 recovery 分支（`boundary` 判定、durable 去重、探测/降级、`recoveryHint:false` 开关）；
+  `context-gate.allowKinds` 加 `recovery-hint`；空预设生成器同步；`tools/verify-session.mjs` 新增「compaction recovery hint」检查。
+  单测 **liangshen 76/76**（新增 instruction-hint 10、gate+hint waterfall 集成 3、verifier 3）；goal-confirm 30/30、subagent-access 28/28。
+- **实机（用户测试；DSH 重启后 host pid 180597）**：会话 `session-aa65c681-f842-4ad2-8199-a08ba06226a3`（effective `liangshen`）：
+  首轮 tools=2/零注入；`instruction-hint`@31（213 chars）→ 模型 `cat AGENTS.md`@36；`/compact` → checkpoint@103、`compaction/end`@104
+  → **`recovery-hint`@111（boundary=104，483 chars）** → 压缩后首请求@112 **tools=2** → 模型 `cat AGENTS.md`@116 → 再晋升@122 tools=48。
+  `node tools/verify-session.mjs <session>` → **exit=0，failures: []**（含新检查 `compaction recovery hint`）。
+  证据：`.superpowers/sdd/2026-10-17-compaction-recovery-hint/evidence/e2e-live.md`（本机留痕，不进 git）。
+- **提交**：`831d059`（docs，设计+调研）与 `6ae5cb6`（feat，实现+测试），均已推送远程 `main`。
+- **未验证 / 备注**：空预设未单独跑 recovery 实机（插件/组合同源 + 生成器同步 + 单测覆盖）；旧会话不追溯；
+  D-015（若 hint 仍被忽略则升级为带内容版）保留为后备。
