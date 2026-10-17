@@ -49,8 +49,8 @@ DSH Chat 的官方扩展点没有「既有行右侧追加内容」的槽位：�
 
 - `plugin_manager install_bundle` → `application: applied`；
 - `cordis_inspect_query`（client `Slots.listSubTree`）两个槽的 `occupants` 均出现 `timing-annotations` / `timing-annotations-turn` 且 `active: true`；
-- 视觉（需用户确认）：运行中的工具/思考行右侧出现实时 `开始 HH:MM · 已用 …`（每 0.5s 刷新）；完成后 assistant 动作区出现
-  `开始 HH:MM · 用时 …`，已完成轮次末尾出现右对齐时间线；
+- 视觉（**用户已确认**）：运行中的工具行右侧出现实时 `开始 HH:MM · 已用 …`（用户以 `sleep 5` 实测，22:21:30–35 看到标签并刷新）；
+  完成后 assistant 动作区出现 `开始 HH:MM · 用时 …`，已完成轮次末尾出现右对齐时间线；
 - 已知限制：assistant-actions 在宿主动作行中，历史轮次的动作行可能 hover 才显示（宿主行为，非本插件控制）；因此「始终可见」的信息以 turnTail 行为准。若要严格逐行常显，只能换成方案 B（DOM 叠加）或整行替换渲染器，均不在本次范围。
 
 ## 六、未验证

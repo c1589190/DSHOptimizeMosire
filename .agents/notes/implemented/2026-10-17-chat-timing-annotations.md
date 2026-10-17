@@ -1,7 +1,7 @@
 # 决策记录：Chat 时间标注（功能六）
 
 - **日期**：2026-10-17（用户「方案A吧，方便一些」当日）
-- **状态**：implemented（bundle 已安装、槽位注册 active；页面视觉待用户确认）
+- **状态**：implemented & user-verified（bundle 已安装、三个槽 active；用户以 `sleep 5` 实测运行中实时标签正常）
 - **关系**：独立 UI 需求；不改变功能一~五。调研结论：DSH Chat 无「既有行右侧追加」官方槽位，只有整行替换或附着槽；用户选择**官方槽位折中**。
 
 ## 裁定
@@ -19,6 +19,10 @@
 - 新 bundle `@mosire/dsh-timing-annotations`（`packages/dsh-timing-annotations/`），Host half 为空 `apply()`，全部在 client half；locale 走 `ctx.locale`，样式只用 `--dsw-alias-*` token，组件局部 `<style>`。
 - `plugin_manager install_bundle` → `application: applied`；`Slots.listSubTree` 三个槽 occupants 见 `timing-annotations`（assistant-actions）、
   `timing-annotations-turn`（turnTail）、`timing-annotations-live`（composer.dock），均 `active: true`。
+
+## 实机结果
+
+- 用户确认：工具运行（`sleep 5`，22:21:30–35）期间，命令右侧出现 `开始 HH:MM · 已用 …` 实时标签并持续刷新。
 
 ## 已知限制 / 未验证
 

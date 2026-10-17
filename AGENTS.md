@@ -155,7 +155,8 @@ D-019=运行中实时计时用 LiveTiming overlay（composer.dock；只读行 DO
    功能一追补 **D-010**：liangshen 两预设的 `tool-subagent` 行已开 `modelSelectionSettings: true` + `agentOptions.reasoningEffort: high`，
    重挂载后 `broken:null`；真实「新会话按次换模型/档位」wire 待新会话验证（旧会话不追溯）。
    功能六（2026-10-17）：bundle `@mosire/dsh-timing-annotations` 已安装；三个槽 occupants `active:true`；按用户追加要求增加
-   LiveTiming overlay（运行中实时 `开始 HH:MM · 已用 …`，D-019）；页面视觉/实时刷新待用户确认。
+   LiveTiming overlay（运行中实时 `开始 HH:MM · 已用 …`，D-019）；**用户已确认**：真实工具运行（`sleep 5`，22:21:30–35）期间
+   命令右侧出现实时计时标签。
    功能五（2026-10-17）：**已实现并实机通过**（`instruction-hint` epoch 感知 recovery + `context-gate.allowKinds`；单测 liangshen 76/76）；用户重启后会话 `session-aa65c681…`：压缩@104 → recovery-hint@111 → 首请求 tools=2 → 模型重读 AGENTS.md@116，verifier exit=0。证据本机 `.superpowers/sdd/2026-10-17-compaction-recovery-hint/`；空预设未单独跑 recovery。
 3. 任何新增「待裁定」先做口径溯源并落盘，已有裁定不重复问（见 `docs/AGENTS.md` §二）。
 4. 用户 2026-10-17 已授权本阶段 `git commit` + push 到 `git@github.com:c1589190/DSHOptimizeMosire.git`（main）。

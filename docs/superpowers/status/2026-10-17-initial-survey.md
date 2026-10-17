@@ -199,5 +199,6 @@
 - **用户追加（2026-10-17）**：A 的槽位只在完成后渲染，不满足「运行期间就显示」。新增 **LiveTiming overlay**（`conversation.composer.dock`，500ms 轮询）：
   对 running `tool-call`（root.time）与 running `assistant-step`（location.step.start.time）在对应行右侧渲染 `开始 HH:MM · 已用 …` 固定标签；
   只读 `[data-chat-node-key]` 行位置做对齐，不改宿主 DOM（D-019）。
-- **未验证**：页面视觉/实时刷新/深浅色/历史分页后的准确性需用户刷新后确认（本机无浏览器控制）；`assistant-actions` 位于宿主动作行，历史轮次可能 hover 才显示，常显信息以 turnTail 为准。
+- **实机确认（用户）**：`sleep 5`（22:21:30–35）运行期间，命令右侧出现实时 `开始 HH:MM · 已用 …` 标签并持续刷新——LiveTiming 工作正常。
+- **未验证**：深浅色主题、历史分页加载后的标注准确性未单独验；`assistant-actions` 位于宿主动作行，历史轮次可能 hover 才显示，常显信息以 turnTail 为准。
 - 设计：`docs/superpowers/specs/2026-10-17-chat-timing-annotations-design.md`；决策：`.agents/notes/implemented/2026-10-17-chat-timing-annotations.md`。
