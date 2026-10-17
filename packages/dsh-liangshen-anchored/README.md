@@ -19,11 +19,18 @@
 ## 安装（Web profile）
 
 ```sh
+# 1) 为组合里的 @deepseek-ai/* 裸包名建 symlink（指向运行中的 DSH 安装）
+node tools/link-dsh-peers.mjs
+# 2) 安装 bundle（或由 plugin_manager install_bundle 安装到当前 profile）
 dsh plugin --profile web add link:/home/cna/DSHOptimizeMosire/packages/dsh-liangshen-anchored
-# 或由 plugin_manager install_bundle 安装到当前 profile
 ```
 
 装完新开会话，在预设选择器里选「梁神模式」。
+
+> 为什么要 symlink：组合 YAML 由 `@deepseek-ai/cordis-plugin-include` 从包内目录加载，
+> 其中的 `@deepseek-ai/*` 裸包名由 Node 从该目录向上找 `node_modules`；workspace 包没有自己的依赖树，
+> 故用 symlink 指向 DSH 安装（realpath 相同，与宿主共享同一模块实例）。
+> 诊断：声明结果会写到 `$DSH_HOME/liangshen-anchored-status.json`（best-effort）。
 
 ## 目录
 

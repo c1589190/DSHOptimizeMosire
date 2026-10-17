@@ -1,16 +1,9 @@
-# M0 spike declaration: insert one agent-preset row whose plugins point at the
-# bundled composition. The include row resolves `path` against its own
-# ctx.baseUrl, so a package-relative path is the first thing to prove here.
+# The anchored LiangShen bundle.
+#
+# A static preset row cannot carry the composition (the include path would
+# resolve against the profile directory). This patch therefore inserts the
+# bundle's own Host plugin, which declares the preset at activation with an
+# absolute file:// URL for the bundled composition; see lib/index.js.
 - insert:
-    - id: preset-liangshen
-      name: '@deepseek-ai/dsh-agent-preset'
-      config:
-        id: liangshen
-        name: 梁神模式
-        description: 'M0 spike: carrying-mechanism probe for the anchored LiangShen preset.'
-        order: 5
-        plugins:
-          - id: liangshen-plugins
-            name: '@deepseek-ai/cordis-plugin-include'
-            config:
-              path: ./presets/liangshen/agent.cordis.yml
+    - id: liangshen-anchored
+      name: '@mosire/dsh-liangshen-anchored'

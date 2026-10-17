@@ -98,9 +98,16 @@ DSHOptimizeMosire/
 
 依据：官方 preset 声明 schema 为 `{id,name,description,order,plugins}`（Inspect 已核）；`@deepseek-ai/cordis-plugin-include` 以 include 的 `ctx.baseUrl` 解析 `config.path`（本机 `…/cordis-plugin-include/lib/index.js:123`）；官方 minimal preset 即静态声明先例。
 
-**判据**：装包后 preset 激活无 diagnostic（`Config.listConfigs` 可见且新建会话可选）。
+**判据**：装包后 roster 里 preset 激活、`broken` 为空（行 active / Config 可见**不算**通过）。
 
-**fallback（M0 30 分钟内判不过即切换）**：`lib/index.js` host 插件，`apply()` 内用 `ctx.agentPresets.register({id,name,description,order,plugins})` 声明，include 路径由 `import.meta.url` 求绝对 file URL；`cordis.patch.yml` 改为插入该插件行。该路线已被 TUI `bundled-presets.js` 与 dsh-web `lib/index.js` 两条上游实现证明。
+**M0 实测结论（2026-10-17）：首选静态声明不可用，采用 fallback。** 证据：
+① bundle patch 顶层 `config` 的 `!!js` 不进校验（inert 标记）；
+② `include.config.path` 相对路径按 **profile 目录**（`$DSH_HOME/profiles/<name>/`）解析，找不到包内组合；
+③ 改用 host 插件注册后，组合里的官方裸包名 `@deepseek-ai/*` 从 workspace 包内不可解析（行 fiber 不创建 = "never started"），
+   需要包内 `node_modules/@deepseek-ai/*` symlink 农场（`tools/link-dsh-peers.mjs`，指向运行中的 DSH 安装，realpath 去重共享模块实例）。
+
+**fallback（已采用）**：`lib/index.js` host 插件，`apply()` 内 `ctx.agentPresets.register({id,name,description,order,plugins})`，
+include 路径由 `import.meta.url` 求绝对 file URL；`cordis.patch.yml` 插入该插件行。修复后 `broken: null`（21 行全激活）。
 
 两条路线互斥；M0 结论与证据写入 `.superpowers/sdd/<topic>/impl-ledger.md`。
 
