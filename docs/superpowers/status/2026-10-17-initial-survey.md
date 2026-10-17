@@ -196,5 +196,8 @@
   - `conversation.chat.turnTail`：每完成轮右对齐时间线，逐条列出该轮思考与工具命令的开始/耗时（`ToolResultNode.callTime/time`）；超 12 条截断 `+N`。
   - locale 走 `ctx.locale`、样式只用 `--dsw-alias-*` token；不替换渲染器、不写 DOM。
 - **安装验证**：`plugin_manager install_bundle` → `application: applied`；client `Slots.listSubTree`：`assistant-actions` 出现 `timing-annotations`（order 30）、`turnTail` 出现 `timing-annotations-turn`（order 30），均 `active:true`。
-- **未验证**：页面视觉/深浅色/历史分页后的准确性需用户刷新后确认（本机无浏览器控制）；`assistant-actions` 位于宿主动作行，历史轮次可能 hover 才显示，常显信息以 turnTail 为准。
+- **用户追加（2026-10-17）**：A 的槽位只在完成后渲染，不满足「运行期间就显示」。新增 **LiveTiming overlay**（`conversation.composer.dock`，500ms 轮询）：
+  对 running `tool-call`（root.time）与 running `assistant-step`（location.step.start.time）在对应行右侧渲染 `开始 HH:MM · 已用 …` 固定标签；
+  只读 `[data-chat-node-key]` 行位置做对齐，不改宿主 DOM（D-019）。
+- **未验证**：页面视觉/实时刷新/深浅色/历史分页后的准确性需用户刷新后确认（本机无浏览器控制）；`assistant-actions` 位于宿主动作行，历史轮次可能 hover 才显示，常显信息以 turnTail 为准。
 - 设计：`docs/superpowers/specs/2026-10-17-chat-timing-annotations-design.md`；决策：`.agents/notes/implemented/2026-10-17-chat-timing-annotations.md`。

@@ -141,7 +141,8 @@ D-008=生成器（`tools/sync-preset-variant.mjs`）+ 提交产物、单测防�
 再评估升级为「带内容版/方案 A」（本轮不做）；D-016=`complete:true` 永久缺口（runtime-context/plan policy/tool guidance）另立、不捆绑。
 
 **功能六（Chat 时间标注）**：D-017（2026-10-17 用户「方案A吧」）=用两个官方 additive 槽（assistant-actions + turnTail）显示开始时间/耗时，
-不替换 Chat 渲染器、不写 DOM；D-018=保留 DSH 自带 Trajectory 视图作为现成能力，不二次开发。
+不替换 Chat 渲染器、不写 DOM；D-018=保留 DSH 自带 Trajectory 视图作为现成能力，不二次开发；
+D-019=运行中实时计时用 LiveTiming overlay（composer.dock；只读行 DOM 对齐，不改宿主 DOM）。
 
 **当前门禁（必须遵守）**：
 1. 功能一/二 spec 与计划已获用户批准并已提交；功能三/四 设计已定（用户 2026-10-17「出设计，提交并推送，然后开始实现」授权直接实现）。
@@ -153,7 +154,8 @@ D-008=生成器（`tools/sync-preset-variant.mjs`）+ 提交产物、单测防�
    verifier exit=0：system 恰好一个空格、首请求双工具、零注入、晋升 48 工具）；仅空预设的**压缩重锚**未验（需 /compact）。
    功能一追补 **D-010**：liangshen 两预设的 `tool-subagent` 行已开 `modelSelectionSettings: true` + `agentOptions.reasoningEffort: high`，
    重挂载后 `broken:null`；真实「新会话按次换模型/档位」wire 待新会话验证（旧会话不追溯）。
-   功能六（2026-10-17）：bundle `@mosire/dsh-timing-annotations` 已安装且两个槽 occupants `active:true`；页面视觉待用户刷新确认。
+   功能六（2026-10-17）：bundle `@mosire/dsh-timing-annotations` 已安装；三个槽 occupants `active:true`；按用户追加要求增加
+   LiveTiming overlay（运行中实时 `开始 HH:MM · 已用 …`，D-019）；页面视觉/实时刷新待用户确认。
    功能五（2026-10-17）：**已实现并实机通过**（`instruction-hint` epoch 感知 recovery + `context-gate.allowKinds`；单测 liangshen 76/76）；用户重启后会话 `session-aa65c681…`：压缩@104 → recovery-hint@111 → 首请求 tools=2 → 模型重读 AGENTS.md@116，verifier exit=0。证据本机 `.superpowers/sdd/2026-10-17-compaction-recovery-hint/`；空预设未单独跑 recovery。
 3. 任何新增「待裁定」先做口径溯源并落盘，已有裁定不重复问（见 `docs/AGENTS.md` §二）。
 4. 用户 2026-10-17 已授权本阶段 `git commit` + push 到 `git@github.com:c1589190/DSHOptimizeMosire.git`（main）。

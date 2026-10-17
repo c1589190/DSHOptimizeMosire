@@ -10,11 +10,15 @@
   - `conversation.chat.assistant-actions`：每条最终 assistant 消息动作区右侧 `开始 HH:MM · 用时 XmYYs`（数据：`timing.stepStartTime`/`timing.completedTime`）；
   - `conversation.chat.turnTail`：每个已完成轮次末尾右对齐时间线，逐条列出该轮**思考**与**工具命令**的开始时间和耗时（数据：assistant timing + `ToolResultNode.callTime/time`）。
 - **D-018**：DSH 自带 Trajectory 视图（每条记录的开始时间/耗时 + timing overview）保留为现成能力，不二次开发、不替代本插件。
+- **D-019（2026-10-17 用户追加）**：用户要的是「工具**运行期间**就显示」，而 additive 槽（assistant-actions/turnTail）只在完成后渲染 ⇒
+  追加 LiveTiming overlay：挂 `conversation.composer.dock`，500ms 轮询 Chat 快照中的 running tool-call / assistant-step，
+  用 `position: fixed` 在对应行右侧渲染自己的实时 `开始 HH:MM · 已用 …` 标签；只读行 DOM 的 `[data-chat-node-key]` 做对齐，**不改宿主 DOM**。
 
 ## 实现
 
 - 新 bundle `@mosire/dsh-timing-annotations`（`packages/dsh-timing-annotations/`），Host half 为空 `apply()`，全部在 client half；locale 走 `ctx.locale`，样式只用 `--dsw-alias-*` token，组件局部 `<style>`。
-- `plugin_manager install_bundle` → `application: applied`；`Slots.listSubTree` 两个槽 occupants 见 `timing-annotations` / `timing-annotations-turn`，`active: true`。
+- `plugin_manager install_bundle` → `application: applied`；`Slots.listSubTree` 三个槽 occupants 见 `timing-annotations`（assistant-actions）、
+  `timing-annotations-turn`（turnTail）、`timing-annotations-live`（composer.dock），均 `active: true`。
 
 ## 已知限制 / 未验证
 

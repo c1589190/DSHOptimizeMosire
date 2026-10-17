@@ -10,7 +10,11 @@
 DSH Chat 的官方扩展点没有「既有行右侧追加内容」的槽位：可用的只有 `conversation.chat.node`（整行替换，shadows-shipped-ui）与少数附属槽。方案 A 用两个 additive 槽实现：
 
 1. `conversation.chat.assistant-actions`（list，`replaceRisk: none`）：每条**最终 assistant 消息**的动作区右侧显示 `开始 HH:MM · 用时 XmYYs`；
-2. `conversation.chat.turnTail`（list，`replaceRisk: none`）：每个**已完成轮次**末尾右对齐显示本轮时间线：`本轮 HH:MM–HH:MM · 总耗时` + 每次思考/工具调用的 `开始 · 耗时`。
+2. `conversation.chat.turnTail`（list，`replaceRisk: none`）：每个**已完成轮次**末尾右对齐显示本轮时间线：`本轮 HH:MM–HH:MM · 总耗时` + 每次思考/工具调用的 `开始 · 耗时`；
+3. **运行中实时计时（2026-10-17 用户追加要求）**：前两个槽只在「完成后」渲染，无法显示运行中的计时。新增 `conversation.composer.dock` 中的 LiveTiming 组件：
+   每 500ms 读取 Chat 快照里仍在运行的 `tool-call`（`root.phase` 存在，`root.time` 为开始）与 `assistant-step`（`status === 'running'`，
+   开始时间取 `node.location.step.start.time`，缺失时用首次观察到的时间兜底），在对应行右侧以 `position: fixed` 渲染自己的
+   `开始 HH:MM · 已用 XmYYs` 标签；只**读**行 DOM 的 `[data-chat-node-key]` 位置用于对齐，不改动宿主 DOM。行结束/隐藏即消失。
 
 ## 二、数据来源（不新增事件、不改会话日志）
 
@@ -45,7 +49,8 @@ DSH Chat 的官方扩展点没有「既有行右侧追加内容」的槽位：�
 
 - `plugin_manager install_bundle` → `application: applied`；
 - `cordis_inspect_query`（client `Slots.listSubTree`）两个槽的 `occupants` 均出现 `timing-annotations` / `timing-annotations-turn` 且 `active: true`；
-- 视觉（需用户确认）：assistant 消息动作区出现 `开始 HH:MM · 用时 …`；已完成轮次末尾出现右对齐时间线；
+- 视觉（需用户确认）：运行中的工具/思考行右侧出现实时 `开始 HH:MM · 已用 …`（每 0.5s 刷新）；完成后 assistant 动作区出现
+  `开始 HH:MM · 用时 …`，已完成轮次末尾出现右对齐时间线；
 - 已知限制：assistant-actions 在宿主动作行中，历史轮次的动作行可能 hover 才显示（宿主行为，非本插件控制）；因此「始终可见」的信息以 turnTail 行为准。若要严格逐行常显，只能换成方案 B（DOM 叠加）或整行替换渲染器，均不在本次范围。
 
 ## 六、未验证
