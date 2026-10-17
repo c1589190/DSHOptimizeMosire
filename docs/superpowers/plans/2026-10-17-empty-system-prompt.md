@@ -15,33 +15,33 @@
 **Files:** `tools/sync-preset-variant.mjs`（新）；`packages/dsh-liangshen-anchored/presets/liangshen/agent.empty-system.cordis.yml`（生成）；
 `presets/liangshen/preset.empty-system.yml`。
 
-- [ ] Step 1: 写生成器：`renderEmptySystemComposition(baseText)` 做两处确定性替换 + 生成头注释；CLI `--write` /
+- [x] Step 1: 写生成器：`renderEmptySystemComposition(baseText)` 做两处确定性替换 + 生成头注释；CLI `--write` /
       默认校验并输出 diff 状态；导出函数供测试导入。
-- [ ] Step 2: 运行 `node tools/sync-preset-variant.mjs --write` 生成产物。
-- [ ] Step 3: 写 `preset.empty-system.yml`（name/description/order）。
-- [ ] Step 4: 手查产物：persona 行 `const persona = ' '`、其余与主组合一致。
+- [x] Step 2: 运行 `node tools/sync-preset-variant.mjs --write` 生成产物。
+- [x] Step 3: 写 `preset.empty-system.yml`（name/description/order）。
+- [x] Step 4: 手查产物：persona 行 `const persona = ' '`、其余与主组合一致。
 
 ## Task 2: host 插件多预设注册
 
 **Files:** `packages/dsh-liangshen-anchored/lib/index.js`、`test/composition.test.mjs`（或新增 `test/presets.test.mjs`）。
 
-- [ ] Step 1: 写失败测试：两个预设源文件存在；元数据 order 5/6；组合一致性
+- [x] Step 1: 写失败测试：两个预设源文件存在；元数据 order 5/6；组合一致性
       `emptyFile === renderEmptySystemComposition(baseFile)`；两份各 21 row。
-- [ ] Step 2: 重构 `lib/index.js`：`PRESETS` 规格表 + 逐预设注册（互相隔离 try/catch），
+- [x] Step 2: 重构 `lib/index.js`：`PRESETS` 规格表 + 逐预设注册（互相隔离 try/catch），
       状态文件 schema v2（`presets:[{id,composition,broken,error?}]`），保留 `declared` 兼容字段。
-- [ ] Step 3: 测试 PASS；`node --check lib/index.js`。
+- [x] Step 3: 测试 PASS；`node --check lib/index.js`。
 
 ## Task 3: verify-session 支持空 system 模式
 
 **Files:** `tools/verify-session.mjs`、`test/verify-session.test.mjs`。
 
-- [ ] Step 1: 写失败测试：合成事件（system `" "`、首请求双工具）在 `--preset liangshen-empty-system` 下
+- [x] Step 1: 写失败测试：合成事件（system `" "`、首请求双工具）在 `--preset liangshen-empty-system` 下
       `failures: []`；主预设数据在该模式应失败（反之亦然）；`systemPrompt` 选项显式覆盖。
-- [ ] Step 2: 实现 `analyzeSession(events,{preset,systemPrompt})` + CLI 依据 preset 自动选择；
+- [x] Step 2: 实现 `analyzeSession(events,{preset,systemPrompt})` + CLI 依据 preset 自动选择；
       `space` 模式检查「system === ' '」与「无 harness identity」。
-- [ ] Step 3: 测试 PASS。
+- [x] Step 3: 测试 PASS。
 
-## Task 4: 安装 + 真实 wire 验证
+## Task 4: 安装 + 真实 wire 验证（待 DSH 重启）
 
 - [ ] Step 1: `plugin_manager install_bundle …/packages/dsh-liangshen-anchored` 重装 → 状态文件两预设 `broken:null`。
 - [ ] Step 2: 请用户新建 Web 会话选「梁神模式·空系统提示词」跑一次 bash 任务；取会话日志跑

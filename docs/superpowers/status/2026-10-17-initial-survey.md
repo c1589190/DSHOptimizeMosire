@@ -114,3 +114,31 @@
 
 ### 仓库
 - 2026-10-17 晚本轮提交：功能二 bundle + 功能一 T4 + 调研 03 + 功能三/四 spec/plan/决策记录（随本轮 commit 推送）。
+
+## 九、实现进度（2026-10-17 深夜 · 功能三 M1 + 功能四代码）
+
+### 功能三 · 子 Agent 访问（M1 已实现并真实 E2E 通过）
+- 新 bundle `packages/dsh-subagent-access/`（`@mosire/dsh-subagent-access`）：host 插件向 root 会话
+  （`delegationDepth===0`）安装三个模型工具 `subagent_list` / `subagent_message` / `subagent_interrupt`，
+  只调官方 `ctx.subagents.listChildren/sendMessage/interrupt` + `ctx.agents` 状态；默认不装到子会话，
+  `includeDelegatedAgents` 可开；无 prompt section、工具名不与 Team 冲突。
+- 单测 28/28（catalog 10 + plugin 18）；`tools/link-dsh-peers.mjs` 泛化为多包扫描（26→25 链接，仍只缺 DSH 未安装的
+  `dsh-workflow-worker-thread`）；三包回归 58 + 30 + 28 全绿。
+- 安装 `application: applied`；`~/.dsh/subagent-access-status.json` 已写出（本会话在 installed 列表）；
+  `Tool.listTools` 可见三工具（B1 通过）。
+- **真实 E2E 通过**（证据 `.superpowers/sdd/2026-10-17-subagent-access/evidence/e2e-live.md`）：
+  派发 `sleep` 子会话 → `subagent_list` 显示 running → `subagent_interrupt` 返回 previousStatus=running 且子会话被停 →
+  `subagent_message` 返回 messageId、子会话唤醒新回合并回报 `ACCESS-E2E-OK`；Team 的 `list_agents` 行为不变。
+- 未验：one-shot NOT_RESUMABLE（仅单测）、冷恢复、父离线、跨进程、Windows。
+
+### 功能四 · 空系统提示词预设（代码完成，激活待 DSH 重启）
+- `tools/sync-preset-variant.mjs`（生成器 + `--write`/校验）；产物 `agent.empty-system.cordis.yml`
+  （463 行 = 458 + 生成头；唯一语义差异 `const persona = ' '`）；`preset.empty-system.yml`（order 6）。
+- host 插件 `lib/index.js` 改为多预设注册（状态文件 schema v2）；单测 `test/presets.test.mjs` 4/4。
+- verifier 增加 `space` 模式：首条 system message 必须**恰好一个 ASCII 空格**；组合一致性/元数据测试 58/58 全绿。
+- **已知阻塞**：plugin_manager 关/开 bundle 只重新 apply 已缓存的旧模块，新 `lib/index.js` 需 **DSH 重启**才会加载；
+  因此 `~/.dsh/liangshen-anchored-status.json` 仍是单预设旧 schema。重启后验证：roster 两个预设 `broken:null`（A1），
+  然后用户新建会话选「梁神模式·空系统提示词」跑一次真实 wire（B1–B3）。
+
+### 仓库
+- 本轮提交（features 3 + 4 + docs）随 2026-10-17 深夜提交推送。

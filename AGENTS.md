@@ -128,8 +128,11 @@ D-008=生成器（`tools/sync-preset-variant.mjs`）+ 提交产物、单测防�
 
 **当前门禁（必须遵守）**：
 1. 功能一/二 spec 与计划已获用户批准并已提交；功能三/四 设计已定（用户 2026-10-17「出设计，提交并推送，然后开始实现」授权直接实现）。
-2. 进度（2026-10-17 晚）：功能一 **M0/T1/T2/T3/T4/T5 完成**（未验：Windows 实机、子代理锚定 E1、resume F1）；
+2. 进度（2026-10-17 深夜）：功能一 **M0/T1/T2/T3/T4/T5 完成**（未验：Windows 实机、子代理锚定 E1、resume F1）；
    功能二 **实现+单测 30/30、bundle 已装、真实会话 E2E 成功**（取消并删 goal 路径，状态文件 action=cancel/cleared=true）；
-   功能三/四 **设计+计划已落盘，待提交后实现**。
+   功能三 **M1 已实现并真实 E2E 通过**（三工具 list/message/interrupt；证据 `.superpowers/sdd/2026-10-17-subagent-access/evidence/e2e-live.md`；
+   M2 锚定语义实验未开始）；
+   功能四 **代码+单测完成（58/58 含 verifier/组合）**，但新 host 插件代码需 **DSH 重启**才加载：
+   重启后验证两预设 `broken:null`，再由用户新建会话选「梁神模式·空系统提示词」做真实 wire 验证。
 3. 任何新增「待裁定」先做口径溯源并落盘，已有裁定不重复问（见 `docs/AGENTS.md` §二）。
 4. 用户 2026-10-17 已授权本阶段 `git commit` + push 到 `git@github.com:c1589190/DSHOptimizeMosire.git`（main）。
