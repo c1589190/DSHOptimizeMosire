@@ -30,7 +30,7 @@
 ### 3.1 初始 hint（保持不变）
 
 - 条件：epoch `boundary === -1` 且已晋升（`promoteOn` 默认 `either`）且本会话尚未注入；
-- 内容：现有文本「Workspace instruction files exist: … Do NOT assume their content. …」；
+- 内容：现有文本「Workspace instruction files exist: … Do NOT assume their content: all instructions in these files are important. Read the complete files …」（2026-10-17 追加：明确要求完整阅读，不只开头）；
 - 一次性（进程内 Set + durable 事件去重），与现状完全一致。
 
 ### 3.2 压缩恢复 hint（新增）
@@ -41,10 +41,10 @@
   - project root：cwd 向上找 `.git/.hg/.svn`，无 marker 回退 cwd；
   - 候选：`AGENTS.md` / `CLAUDE.md` / `AGENTS.local.md` / `CLAUDE.local.md`；
   - user-global：`$DSH_HOME/AGENTS.md`（`DSH_HOME` 未设时 POSIX 回退 `~/.dsh`）。
-- **文本模板**（一个 user/message，非命令式，约 400–700 chars）：
+- **文本模板**（一个 user/message，非命令式，约 400–700 chars；hint 必须强调「指令文件里的**全部内容都重要，必须完整阅读**」）：
   - 「上下文刚被压缩，之前的工作环境/纪律可能已不可见，继续前先恢复」；
-  - 有指令文件：「Read the workspace instruction files and follow them: <files> (project root: <root>).」；
-  - 无指令文件：「No AGENTS.md/CLAUDE.md was found near <root>; if the workspace lives in a parent or subdirectory, locate the repository root first (e.g. `git rev-parse --show-toplevel`) and read its instruction files before continuing.」；
+  - 有指令文件：「Read the workspace instruction files completely (all of their content is important) and follow them: <files> (project root: <root>).」；
+  - 无指令文件：「No AGENTS.md/CLAUDE.md was found near <root>; if the workspace lives in a parent or subdirectory, locate the repository root first (e.g. `git rev-parse --show-toplevel`) and read its instruction files **completely** (all of its content is important) before continuing.」；
   - 有 user-global 文件：「A user-global instruction file exists: AGENTS.md.」；
   - 「If the instruction files point to a status or handoff document, re-read it to restore progress.」；
   - 「This session keeps no skill catalog: use `skill_search` to discover skills and `skill_load` to activate one when the task matches.」

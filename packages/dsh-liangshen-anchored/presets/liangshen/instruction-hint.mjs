@@ -18,8 +18,9 @@
  *        walking up from the session cwd to the project root (a directory
  *        containing `.git`, or the cwd itself).
  *    The hint instructs the model to READ the files before acting when
- *    relevant, without embedding their content. Pre-promotion requests get NO
- *    initial hint (matches the anchored bootstrap).
+ *    relevant, without embedding their content, and states that every
+ *    instruction in them is important so the files must be read completely.
+ *    Pre-promotion requests get NO initial hint (matches the anchored bootstrap).
  *
  *  - RECOVERY hint (feature 5): a `compaction/end` rewrites the visible
  *    surface, so the initial hint (and any AGENTS.md content the model read)
@@ -180,7 +181,7 @@ function composeInitialText(probe) {
   if (sections.length === 0) return undefined
   return [
     ...sections,
-    'Do NOT assume their content. When a task touches this workspace, read the relevant instruction files first and follow them.',
+    'Do NOT assume their content: all instructions in these files are important. Read the complete files (every section, not just the beginning) before acting on this workspace, and follow them.',
   ].join(' ')
 }
 
@@ -190,9 +191,9 @@ function composeRecoveryText(probe) {
     'The conversation history was just compacted, so earlier workspace guidance may no longer be visible. Restore the working environment before continuing.',
   ]
   if (probe.projectFiles.length > 0) {
-    parts.push(`Read the workspace instruction files and follow them: ${probe.projectFiles.join(', ')} (project root: ${probe.root}).`)
+    parts.push(`Read the workspace instruction files completely (all of their content is important) and follow them: ${probe.projectFiles.join(', ')} (project root: ${probe.root}).`)
   } else {
-    parts.push('If the workspace lives in a parent or subdirectory, locate the repository root first (for example with `git rev-parse --show-toplevel`) and read its AGENTS.md or CLAUDE.md before continuing.')
+    parts.push('If the workspace lives in a parent or subdirectory, locate the repository root first (for example with `git rev-parse --show-toplevel`) and read its AGENTS.md or CLAUDE.md completely (all of its content is important) before continuing.')
   }
   if (probe.userGlobalFiles.length > 0) {
     parts.push(`A user-global instruction file exists: ${USER_GLOBAL_CANDIDATE}.`)

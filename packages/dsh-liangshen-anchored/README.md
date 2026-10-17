@@ -20,7 +20,7 @@
 3. **压缩重锚**：`compaction/end` 之后 epoch 感知地回到受控态，等新的持久信号再晋升。
 4. **子代理同相位**：`includeSubagents: true`，子代理首轮同样锚定。
 5. **压缩后恢复 hint**（功能五）：每个 `compaction/end` 后的第一条请求额外注入一条恢复提示——
-   重读 AGENTS.md/CLAUDE.md（必要时先定位仓库根）、按 AGENTS.md 索引恢复 status/handoff、
+   重读 AGENTS.md/CLAUDE.md（**全部内容都重要，必须完整读完**；必要时先定位仓库根）、按 AGENTS.md 索引恢复 status/handoff、
    用 `skill_search`/`skill_load` 恢复技能环境。每个压缩纪元仅一次、按 boundary 与 durable 事件去重（resume 安全）；
    该消息经 `context-gate.allowKinds` 放行，压缩后首请求工具面仍是 Minimal 双工具；`recoveryHint: false` 可关闭。
 

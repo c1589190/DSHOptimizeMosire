@@ -57,7 +57,8 @@ test('initial hint is injected once after promotion', async () => {
   assert.equal(hint.source.kind, 'instruction-hint')
   assert.equal(hint.source.form, 'hint')
   assert.match(textOf(hint), /Workspace instruction files exist: AGENTS\.md/)
-  assert.match(textOf(hint), /read the relevant instruction files first/)
+  assert.match(textOf(hint), /all instructions in these files are important/)
+  assert.match(textOf(hint), /Read the complete files/)
 
   const second = await preStep(listeners, agent)
   assert.equal(messagesOf(second).length, 0, 'initial hint must not repeat')
@@ -75,6 +76,8 @@ test('recovery hint is injected right after compaction even while unpromoted', a
   assert.equal(hint.id, 'recovery-hint-s2-2')
   assert.match(textOf(hint), /just compacted/)
   assert.match(textOf(hint), /AGENTS\.md/)
+  assert.match(textOf(hint), /read the workspace instruction files completely/i)
+  assert.match(textOf(hint), /all of their content is important/i)
   assert.match(textOf(hint), /skill_search/)
   assert.match(textOf(hint), /skill_load/)
 })
@@ -124,7 +127,9 @@ test('recovery hint without instruction files tells the model to locate the repo
   const agent = makeAgent('s6', [...COMPACTED_ONCE], '/work/parent')
   const decision = await preStep(listeners, agent)
   assert.equal(messagesOf(decision).length, 1)
-  assert.match(textOf(messagesOf(decision)[0]), /locate the repository root/)
+  const recoveryText = textOf(messagesOf(decision)[0])
+  assert.match(recoveryText, /locate the repository root/)
+  assert.match(recoveryText, /all of its content is important/)
 })
 
 test('recovery hint survives a missing fs seam with the generic text', async () => {
