@@ -1,8 +1,10 @@
 # 依赖与构建产物
+# NOTE: do NOT ignore `lib/` globally — the workspace plugin packages keep their
+# source entry modules under `packages/*/lib/` (there is no build step), so that
+# directory is tracked. Only dependency/build directories are ignored here.
 node_modules/
 .pnpm-store/
 dist/
-lib/
 coverage/
 *.tsbuildinfo
 
