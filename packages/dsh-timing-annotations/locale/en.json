@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Chat Timing Annotations",
+    "description": "Shows when each assistant message started and how long it took, plus a right-aligned per-turn line with the start time and duration of every thinking step and tool call."
+  }
+}

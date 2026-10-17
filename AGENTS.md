@@ -20,7 +20,7 @@
   本机残留的 `~/.dsh/.agent-presets/liangshen/` 因此不再被任何会话读取；dsh-web 插件版后来又在 v0.3.23 重构为「极简 persona + PTC/both」，锚定被退役。
 - **一手复刻材料**：本机 legacy 目录里的 v7 源码（9 文件 / 1451 行）+ TUI 0.15.0 包内同源副本
   （`@deepseek-harness-tui/dsh-tui/presets/liangshen/`）。现代承载形态必须改成 **bundle patch + `@deepseek-ai/dsh-agent-preset` 声明**。
-- **本项目目标（五个功能）**：
+- **本项目目标（六个功能）**：
   - **功能一 · 梁神模式复刻**：以官方机制把锚定式 v7 重建为可安装的 DSH 插件/preset（Web profile bundle），并做**有对照证据**的优化
     （本轮范围：`promoteOn: either` + `context-gate` + Windows 后台任务；双分支/熔断/事实登记簿留待后续）。
   - **功能二 · goal 续轮确认门**：goal 自动续轮注入时，Web UI 弹显式确认（确认→继续 / 取消→删除 goal / 30s 可配置无操作→继续）。
@@ -31,6 +31,9 @@
   - **功能四 · 空系统提示词预设**：新增第二预设 `liangshen-empty-system`——梁神模式但系统提示词替换为单个 ASCII 空格，其余完全一致。
   - **功能五 · 压缩后恢复 hint**：`compaction/end` 后额外注入一条恢复 hint（提醒重读 AGENTS.md/CLAUDE.md、定位仓库根、恢复 status/handoff、
     用 `skill_search`/`skill_load` 恢复技能环境）；纯提示、不注入文件内容、不回挂官方注入源。裁定见 D-011~D-014。
+  - **功能六 · Chat 时间标注（Web UI 插件）**：独立 bundle `@mosire/dsh-timing-annotations`，只用 Chat 官方 additive slots
+    （`conversation.chat.assistant-actions` + `conversation.chat.turnTail`）显示每条 assistant 消息的开始时间/耗时，
+    以及每轮思考/工具命令的开始时间与耗时；不替换渲染器、不写 DOM。裁定见 D-017/D-018。
 - 权威顺序：**用户原话 > 最新落盘文档 > 本文件 > `docs/agents/*.md` 长文 > 上游参考（DSH / TUI / dsh-web 的源码与 README）> 旧文档**。
 - 「当前状态」不抄在本文件：看 `docs/superpowers/status/` 最新一份 + `git log --oneline`。
 
@@ -87,6 +90,7 @@
 - `docs/superpowers/specs/2026-10-17-subagent-access-design.md` —— 功能三：父→子控制面三工具/Team 共存/验收判据；§8 为 M2 锚定语义实验设计。
 - `docs/superpowers/specs/2026-10-17-empty-system-prompt-design.md` —— 功能四：空系统提示词预设（生成器+产物、多预设注册、verifier 扩展）。
 - `docs/superpowers/specs/2026-10-17-compaction-recovery-hint-design.md` —— 功能五：压缩后恢复 hint（epoch 感知注入/gate allowKinds/验收判据）。
+- `docs/superpowers/specs/2026-10-17-chat-timing-annotations-design.md` —— 功能六：Chat 时间标注（官方槽位方案 A/数据来源/已知限制）。
 - `docs/superpowers/plans/2026-10-17-liangshen-anchored.md`、`…-goal-confirm-gate.md`、`…-subagent-access.md`、`…-empty-system-prompt.md`、`…-compaction-recovery-hint.md` —— 逐任务实现计划。
 
 **④ 状态与交接**
@@ -136,6 +140,9 @@ D-008=生成器（`tools/sync-preset-variant.mjs`）+ 提交产物、单测防�
 `context-gate.allowKinds` 放行 `recovery-hint`）；D-014=铁律 3 修正为「每个压缩纪元可再注入一条恢复 hint」；D-015=若实测 hint 仍被忽略，
 再评估升级为「带内容版/方案 A」（本轮不做）；D-016=`complete:true` 永久缺口（runtime-context/plan policy/tool guidance）另立、不捆绑。
 
+**功能六（Chat 时间标注）**：D-017（2026-10-17 用户「方案A吧」）=用两个官方 additive 槽（assistant-actions + turnTail）显示开始时间/耗时，
+不替换 Chat 渲染器、不写 DOM；D-018=保留 DSH 自带 Trajectory 视图作为现成能力，不二次开发。
+
 **当前门禁（必须遵守）**：
 1. 功能一/二 spec 与计划已获用户批准并已提交；功能三/四 设计已定（用户 2026-10-17「出设计，提交并推送，然后开始实现」授权直接实现）。
 2. 进度（2026-10-17 深夜）：功能一 **M0/T1/T2/T3/T4/T5 完成**（未验：Windows 实机、子代理锚定 E1、resume F1）；
@@ -146,6 +153,7 @@ D-008=生成器（`tools/sync-preset-variant.mjs`）+ 提交产物、单测防�
    verifier exit=0：system 恰好一个空格、首请求双工具、零注入、晋升 48 工具）；仅空预设的**压缩重锚**未验（需 /compact）。
    功能一追补 **D-010**：liangshen 两预设的 `tool-subagent` 行已开 `modelSelectionSettings: true` + `agentOptions.reasoningEffort: high`，
    重挂载后 `broken:null`；真实「新会话按次换模型/档位」wire 待新会话验证（旧会话不追溯）。
+   功能六（2026-10-17）：bundle `@mosire/dsh-timing-annotations` 已安装且两个槽 occupants `active:true`；页面视觉待用户刷新确认。
    功能五（2026-10-17）：**已实现并实机通过**（`instruction-hint` epoch 感知 recovery + `context-gate.allowKinds`；单测 liangshen 76/76）；用户重启后会话 `session-aa65c681…`：压缩@104 → recovery-hint@111 → 首请求 tools=2 → 模型重读 AGENTS.md@116，verifier exit=0。证据本机 `.superpowers/sdd/2026-10-17-compaction-recovery-hint/`；空预设未单独跑 recovery。
 3. 任何新增「待裁定」先做口径溯源并落盘，已有裁定不重复问（见 `docs/AGENTS.md` §二）。
 4. 用户 2026-10-17 已授权本阶段 `git commit` + push 到 `git@github.com:c1589190/DSHOptimizeMosire.git`（main）。
