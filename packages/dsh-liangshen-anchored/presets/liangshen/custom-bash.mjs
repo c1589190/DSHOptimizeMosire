@@ -39,6 +39,23 @@
  * confinement on Windows (the sandbox backend is linux-only); the tool
  * description says so. The bootstrap catalog pairs this with
  * `str_replace_editor` (Minimal's two tools).
+ *
+ * OPTIONAL BACKGROUND JOBS (`config.backgroundJobs: true`, default `false`):
+ * the tool registers with one extra optional parameter, `run_in_background`,
+ * and a call that sets it starts the same `bash -c` process through the host
+ * job registry (`ctx.get('jobs')`), returning the registry's job id
+ * immediately. Output chunks are pushed into the job ring as they arrive, so
+ * `job_output` collects them and `job_kill` terminates the process. The
+ * registry is required at apply time and the calling agent session at call
+ * time: a deployment that could not collect or stop the work fails loudly at
+ * mount, and a call with no owner fails loudly instead of starting an orphan.
+ * The default stays OFF, so the existing foreground behavior — and the
+ * verified Linux session behavior — is unchanged unless a composition opts in.
+ *
+ * VERIFICATION: only the foreground path has run in a real session. The
+ * background path is unit-tested against fake seams; NOT real-machine
+ * verified on Windows, because no Windows host with a Git Bash installation
+ * was available to this change.
  */
 
 import { readFileSync } from 'node:fs'
@@ -51,6 +68,9 @@ export const inject = ['subprocess', 'tools']
 
 const DEFAULT_TIMEOUT_MS = 120000
 const DEFAULT_MAX_OUTPUT_BYTES = 64000
+
+/** Longest command excerpt kept as a background job's one-line label. */
+const MAX_JOB_LABEL_LENGTH = 80
 
 /** Tool parameter schema for the model-facing command. */
 const commandSchema = {
@@ -67,6 +87,21 @@ const commandSchema = {
   },
   required: ['command'],
   additionalProperties: false,
+}
+
+/** Opt-in parameter: absent from the schema unless `backgroundJobs` is enabled. */
+const runInBackgroundProperty = {
+  type: 'boolean',
+  description: 'Run the command as a background job and return its job id immediately (collect with job_output, stop with job_kill); no timeout applies. The calling session owns the job.',
+}
+
+/** Tool parameter schema used only when `backgroundJobs` is enabled. */
+const backgroundCommandSchema = {
+  ...commandSchema,
+  properties: {
+    ...commandSchema.properties,
+    run_in_background: runInBackgroundProperty,
+  },
 }
 
 function addCandidate(candidates, seen, candidate) {
@@ -206,6 +241,99 @@ export async function resolveWindowsBash(subprocess, config = {}, environment = 
   throw new Error(`Git Bash executable unavailable (${failures.join('; ')})`)
 }
 
+/**
+ * Validate the opt-in background-job switch and resolve its default.
+ *
+ * Runs before executable discovery and registration, so a misspelled value
+ * fails at mount instead of silently selecting foreground-only behavior.
+ * @param config - the raw plugin config; `undefined` means every default.
+ * @returns the resolved `{ backgroundJobs }` switch.
+ * @throws TypeError when `backgroundJobs` is present and is not a boolean.
+ */
+export function resolveBackgroundJobsConfig(config) {
+  const source = config === undefined ? {} : config
+  const backgroundJobs = source.backgroundJobs
+  if (backgroundJobs !== undefined && typeof backgroundJobs !== 'boolean') {
+    throw new TypeError(`custom-bash: config.backgroundJobs must be a boolean, got ${JSON.stringify(backgroundJobs)}`)
+  }
+  return { backgroundJobs: backgroundJobs === true }
+}
+
+/**
+ * One-line job label for a command: its first line with whitespace collapsed,
+ * truncated for the model-facing roster. The full command still identifies the
+ * work in the job's output ring, so the label only has to be recognizable.
+ * @param command - the model's command string.
+ * @returns a non-empty label of at most {@link MAX_JOB_LABEL_LENGTH} characters.
+ */
+export function backgroundJobLabel(command) {
+  const firstLine = typeof command === 'string'
+    ? command.split(/\r?\n/u)[0].trim().replace(/\s+/gu, ' ')
+    : ''
+  if (firstLine.length === 0) return 'bash command'
+  if (firstLine.length <= MAX_JOB_LABEL_LENGTH) return firstLine
+  return `${firstLine.slice(0, MAX_JOB_LABEL_LENGTH - 3)}...`
+}
+
+/**
+ * The job identity fields fixed before execution starts. Pure, so the
+ * `kind`/`label`/`owner` mapping is testable without a job registry.
+ * @param shape - the command to label and the owning agent session id.
+ * @returns the JobSpec identity subset (`kind`, `label`, `owner`).
+ */
+export function buildJobSpecShape({ command, owner }) {
+  return { kind: 'bash', label: backgroundJobLabel(command), owner }
+}
+
+/**
+ * Map a settled subprocess onto the jobs seam's terminal outcome vocabulary:
+ * cancellation is `killed`, a zero exit is `completed`, and anything else
+ * (non-zero code, signal death) is `failed` with the exit code or signal in
+ * the detail. This differs from the official bash tool, which reports a
+ * non-zero exit as `completed`; here a failed command is a failed job, while
+ * the full output still reaches the model through the job ring.
+ * @param outcome - the subprocess exit facts.
+ * @param cancellation - whether the registry cancelled the job, and its reason.
+ * @returns the `JobOutcome` the registry records.
+ */
+export function backgroundJobOutcome(outcome, { cancelled = false, reason } = {}) {
+  if (cancelled) {
+    const detail = typeof reason === 'string' && reason.length > 0 ? reason : 'cancelled'
+    return { status: 'killed', detail }
+  }
+  if (outcome.exitCode === 0) return { status: 'completed', detail: 'exit code: 0' }
+  const detail = outcome.exitCode === null
+    ? `signal: ${outcome.signal ?? 'unknown'}`
+    : `exit code: ${outcome.exitCode}`
+  return { status: 'failed', detail }
+}
+
+/**
+ * The owning agent session id for a job, or `undefined` when the call has no
+ * live agent. `Agent.id` and `Agent.session.id` are the same SessionId by the
+ * runtime's own invariant; the session form is preferred because the jobs
+ * seam names ownership by session.
+ * @param exec - the tool execution, when the runtime supplied one.
+ * @returns the owning session id, when available.
+ */
+export function backgroundJobOwner(exec) {
+  const sessionId = exec?.agent?.session?.id
+  if (typeof sessionId === 'string' && sessionId.length > 0) return sessionId
+  const agentId = exec?.agent?.id
+  if (typeof agentId === 'string' && agentId.length > 0) return agentId
+  return undefined
+}
+
+/** Read the host job registry, or `undefined` when this composition has none. */
+function jobRegistry(ctx) {
+  try {
+    const registry = typeof ctx.get === 'function' ? ctx.get('jobs') : undefined
+    return registry !== null && registry !== undefined && typeof registry.start === 'function' ? registry : undefined
+  } catch {
+    return undefined
+  }
+}
+
 function warn(ctx, message) {
   try {
     ctx.logger.warn(message)
@@ -214,9 +342,139 @@ function warn(ctx, message) {
   }
 }
 
+/**
+ * Start one background command and wire its process into the job handle.
+ *
+ * The spawn is synchronous because the jobs seam requires `run()` to return
+ * its hooks synchronously; stdout/stderr arrive as raw pipes and are pushed
+ * into the job's output ring as chunks, so the model collects them with
+ * `job_output` exactly like any other background job. `done` never rejects:
+ * every failure path becomes a `JobOutcome` the registry can record.
+ *
+ * NOT real-machine verified on Windows: this path needs a resolvable Git Bash
+ * and a live job registry, and no Windows host was available to exercise it.
+ * Only the foreground spawn path has run in a real session.
+ *
+ * @param ctx - the plugin context (its `subprocess` seam starts the process).
+ * @param command - the resolved executable facts and per-call directory.
+ * @param job - the producer face the registry issued for this job.
+ * @returns the `JobHooks` (`cancel`, `done`) the registry expects.
+ */
+// NOT real-machine verified on Windows: unit-tested with fake seams only.
+function startBackgroundBash(ctx, { bashPath, command, workdir }, job) {
+  let handle
+  let cancelled = false
+  let cancelReason
+  let settle
+  const done = new Promise((resolve) => { settle = resolve })
+  try {
+    handle = ctx.subprocess.spawn({
+      argv: [bashPath, '-c', command],
+      ...workdir !== undefined ? { cwd: workdir } : {},
+      stdio: {
+        stdin: 'ignore',
+        stdout: 'pipe',
+        stderr: 'pipe',
+      },
+      graceMs: 3000,
+    })
+  } catch (error) {
+    // Keep the job registered and settle it as failed: the model received an
+    // id, so the failure must be collectable instead of vanishing.
+    settle({ status: 'failed', detail: `bash spawn failed: ${String(error)}` })
+    return { cancel: () => {}, done }
+  }
+
+  const append = (channel, chunk) => {
+    try {
+      const text = typeof chunk === 'string' ? chunk : String(chunk)
+      if (text.length > 0) job.append(text, { channel })
+    } catch {
+      // Writes after settlement are dropped by contract, and a throwing
+      // producer must never break its own teardown path.
+    }
+  }
+  const wire = (stream, channel) => {
+    if (stream === null || stream === undefined) return
+    if (typeof stream.setEncoding === 'function') stream.setEncoding('utf8')
+    stream.on('data', (chunk) => append(channel, chunk))
+    stream.on('error', () => {
+      // A stream failure surfaces through the handle's outcome instead.
+    })
+  }
+  wire(handle.stdout, 'stdout')
+  wire(handle.stderr, 'stderr')
+
+  handle.done.then(
+    (outcome) => settle(backgroundJobOutcome(outcome, { cancelled, reason: cancelReason })),
+    (error) => settle(cancelled
+      ? backgroundJobOutcome({ exitCode: null, signal: null }, { cancelled, reason: cancelReason })
+      : { status: 'failed', detail: `bash spawn failed: ${String(error)}` }),
+  )
+
+  return {
+    cancel(reason) {
+      if (cancelled) return
+      cancelled = true
+      cancelReason = typeof reason === 'string' && reason.length > 0 ? reason : undefined
+      try {
+        // The seam's only termination verb; the provider escalates to SIGKILL
+        // after its grace period, and `done` settles once the range is gone.
+        handle.terminate()
+      } catch {
+        // The managed range is already gone; `done` still settles.
+      }
+    },
+    done,
+  }
+}
+
+/**
+ * Execute one `run_in_background` call: register the command as a job and
+ * return its id without waiting.
+ *
+ * Both missing prerequisites fail loudly with guidance rather than starting
+ * work the calling agent could never collect or stop.
+ *
+ * NOT real-machine verified on Windows (see {@link startBackgroundBash}).
+ *
+ * @param ctx - the plugin context (jobs registry and subprocess seam).
+ * @param args - the parsed tool arguments.
+ * @param exec - the tool execution carrying the calling agent and session cwd.
+ * @param runtime - the resolved executable and limits shared with the foreground path.
+ * @returns the immediate `started background job <id>` result.
+ * @throws Error when the registry or the owning session is unavailable.
+ */
+function runBackground(ctx, args, exec, { bashPath }) {
+  const registry = jobRegistry(ctx)
+  if (registry === undefined) {
+    throw new Error('custom-bash: background jobs are unavailable in this composition (no job registry exposes start); run this command in the foreground by omitting run_in_background.')
+  }
+  const owner = backgroundJobOwner(exec)
+  if (owner === undefined) {
+    throw new Error('custom-bash: run_in_background needs a calling agent session to own the job; run this command in the foreground by omitting run_in_background.')
+  }
+  const workdir = typeof args.workdir === 'string' && args.workdir.length > 0
+    ? args.workdir
+    : exec?.agent?.session?.header?.cwd
+  const id = registry.start({
+    ...buildJobSpecShape({ command: args.command, owner }),
+    run(job) {
+      return startBackgroundBash(ctx, { bashPath, command: args.command, workdir }, job)
+    },
+  })
+  return { text: `started background job ${id}` }
+}
+
 /** Register the model-facing `bash` tool. */
 export async function apply(ctx, config) {
   const source = config === undefined ? {} : config
+  const { backgroundJobs } = resolveBackgroundJobsConfig(source)
+  // Fail at activation, not on the first call: a composition that enables
+  // background jobs must mount the host registry (and the model controls).
+  if (backgroundJobs && jobRegistry(ctx) === undefined) {
+    throw new TypeError('custom-bash: backgroundJobs is enabled but the host job registry is unavailable — ctx.get(\'jobs\') must exist and expose start(spec). Mount @deepseek-ai/dsh-jobs-local in the host composition and @deepseek-ai/dsh-tool-jobs for job_output/job_kill.')
+  }
   const timeoutMs = Number.isSafeInteger(source.timeoutMs) && source.timeoutMs > 0 ? source.timeoutMs : DEFAULT_TIMEOUT_MS
   const maxOutputBytes = Number.isSafeInteger(source.maxOutputBytes) && source.maxOutputBytes > 0 ? source.maxOutputBytes : DEFAULT_MAX_OUTPUT_BYTES
 
@@ -242,8 +500,11 @@ export async function apply(ctx, config) {
       "* To inspect a particular line range of a file, e.g. lines 10-25, try 'sed -n 10,25p /path/to/the/file'.",
       '* Please avoid commands that may produce a very large amount of output.',
       '* NOTE: runs without OS sandbox confinement on Windows (no landlock); treat output as untrusted.',
+      ...backgroundJobs
+        ? ['* Set `run_in_background: true` on a long-running command to return a job id immediately; collect its output with `job_output` and stop it with `job_kill`.']
+        : [],
     ].join('\n'),
-    parameters: commandSchema,
+    parameters: backgroundJobs ? backgroundCommandSchema : commandSchema,
     timeoutMs,
     output: {
       schema: {
@@ -257,6 +518,11 @@ export async function apply(ctx, config) {
       render: (_args, value) => [{ type: 'text', text: value.text }],
     },
     async execute(args, exec) {
+      // Background work is opt-in by config AND by argument: with the switch
+      // off, the foreground body below is exactly the pre-background behavior.
+      if (backgroundJobs && args?.run_in_background === true) {
+        return runBackground(ctx, args, exec, { bashPath })
+      }
       const workdir = typeof args.workdir === 'string' && args.workdir.length > 0
         ? args.workdir
         : exec?.agent?.session?.header?.cwd
