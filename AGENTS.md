@@ -20,11 +20,15 @@
   本机残留的 `~/.dsh/.agent-presets/liangshen/` 因此不再被任何会话读取；dsh-web 插件版后来又在 v0.3.23 重构为「极简 persona + PTC/both」，锚定被退役。
 - **一手复刻材料**：本机 legacy 目录里的 v7 源码（9 文件 / 1451 行）+ TUI 0.15.0 包内同源副本
   （`@deepseek-harness-tui/dsh-tui/presets/liangshen/`）。现代承载形态必须改成 **bundle patch + `@deepseek-ai/dsh-agent-preset` 声明**。
-- **本项目目标（两个功能）**：
+- **本项目目标（四个功能）**：
   - **功能一 · 梁神模式复刻**：以官方机制把锚定式 v7 重建为可安装的 DSH 插件/preset（Web profile bundle），并做**有对照证据**的优化
     （本轮范围：`promoteOn: either` + `context-gate` + Windows 后台任务；双分支/熔断/事实登记簿留待后续）。
   - **功能二 · goal 续轮确认门**：goal 自动续轮注入时，Web UI 弹显式确认（确认→继续 / 取消→删除 goal / 30s 可配置无操作→继续）。
     调研结论：可用 host 插件在 `agent/pre-step`（prepend）扣住 + 复用官方 `ctx.userQuestions` 卡片 UI，**不改 DSH 源码**。
+  - **功能三 · 子 Agent 访问（父 → 子控制面）**：Web profile 顶层会话的 Team 同名工具遮蔽了普通子会话的控制面
+    （E2E 证据见 `docs/agents/03-…`）。独立 host 插件补 `subagent_list` / `subagent_message` / `subagent_interrupt`
+    三个工具，只调官方 `ctx.subagents` / `ctx.agents`；M2（liangshen 子 Agent 锚定语义）只做实验设计。
+  - **功能四 · 空系统提示词预设**：新增第二预设 `liangshen-empty-system`——梁神模式但系统提示词替换为单个 ASCII 空格，其余完全一致。
 - 权威顺序：**用户原话 > 最新落盘文档 > 本文件 > `docs/agents/*.md` 长文 > 上游参考（DSH / TUI / dsh-web 的源码与 README）> 旧文档**。
 - 「当前状态」不抄在本文件：看 `docs/superpowers/status/` 最新一份 + `git log --oneline`。
 
@@ -65,6 +69,7 @@
 |---|---|
 | `docs/agents/00-调研-梁神模式谱系.md` | 梁神模式是什么 / 四代谱系 / 锚定 v7 逐文件拆解 / 为什么锚定有效（一手数据）/ 优化候选 / 本机资产清单与复核命令 / 待裁定 |
 | `docs/agents/02-调研-goal续轮确认门.md` | 功能二：goal 自动续轮驱动机制 / `agent/pre-step` 拦截点 / 复用官方提问卡片 / 三个方案对比 / v1 语义表 / spike 清单 / 待裁定 |
+| `docs/agents/03-调研-子Agent访问.md` | 子 Agent 访问现状：预设强制继承 / 父→子控制面被 Team 遮蔽（含 E2E 证据）/ 上下文接力断层 / 427 子会话实测 / 优化候选 R1–R4 / 待裁定 |
 
 **② 文档系统与台账**
 
@@ -75,11 +80,13 @@
 
 - `docs/superpowers/specs/2026-10-17-liangshen-anchored-design.md` —— 功能一：骨架/承载 M0 决策门/移植矩阵/晋升状态机/验收判据/里程碑。
 - `docs/superpowers/specs/2026-10-17-goal-confirm-gate-design.md` —— 功能二：拦截算法/问题文案/配置/降级/验证与 spike。
-- `docs/superpowers/plans/2026-10-17-liangshen-anchored.md`、`docs/superpowers/plans/2026-10-17-goal-confirm-gate.md` —— 逐任务实现计划。
+- `docs/superpowers/specs/2026-10-17-subagent-access-design.md` —— 功能三：父→子控制面三工具/Team 共存/验收判据；§8 为 M2 锚定语义实验设计。
+- `docs/superpowers/specs/2026-10-17-empty-system-prompt-design.md` —— 功能四：空系统提示词预设（生成器+产物、多预设注册、verifier 扩展）。
+- `docs/superpowers/plans/2026-10-17-liangshen-anchored.md`、`…-goal-confirm-gate.md`、`…-subagent-access.md`、`…-empty-system-prompt.md` —— 逐任务实现计划。
 
 **④ 状态与交接**
 
-- `docs/superpowers/status/2026-10-17-initial-survey.md` —— 本轮调研存档（**下次开工先读它**）。
+- `docs/superpowers/status/2026-10-17-initial-survey.md` —— 本轮调研与实现进度（**下次开工先读它**）。
 
 ## 五、交叉纪律要点（每条只是概述 + 指针）
 
@@ -112,9 +119,17 @@ D-004=沿用「梁神模式」/ order 5 / MIT；D-005=协议级 smoke + 12 会�
 
 **功能二（goal 续轮确认门）**：G-001=A 官方提问卡片；G-002=A 全局挂载；G-003=A 关闭卡片=取消并删 goal；G-004=A 独立 bundle。
 
+**功能三（子 Agent 访问）**：S-001=M1 只做父→子控制面三工具（M2 锚定语义实验只设计）；S-002=独立 bundle `@mosire/dsh-subagent-access`；
+S-003=三工具 `subagent_list`/`subagent_message`/`subagent_interrupt`、默认只装 root、不加 prompt section；
+S-004=只调官方 `ctx.subagents`/`ctx.agents`，不改 Team、不复制 DSH 源码；S-005=v1 不做 Team 成员过滤（已知限制，M2 再定）。
+
+**功能四（空系统提示词预设）**：D-007=新增独立第二预设 `liangshen-empty-system`（order 6），主预设零改动；
+D-008=生成器（`tools/sync-preset-variant.mjs`）+ 提交产物、单测防漂移；D-009=「空」= 单个 ASCII 空格，真实 wire 以实测为准。
+
 **当前门禁（必须遵守）**：
-1. 两份 spec 与实现计划已获用户批准（2026-10-17「开始吧」），并已提交推送；实现进行中。
-2. 进度：功能一 **M0 承载 spike 通过 / T1 骨架 / T2 移植+单测 / T3 verifier / T5 元数据完成**；
-   T3 真实会话协议证据待用户手工验证，T4（Windows 后台任务，config-gated）待做。
+1. 功能一/二 spec 与计划已获用户批准并已提交；功能三/四 设计已定（用户 2026-10-17「出设计，提交并推送，然后开始实现」授权直接实现）。
+2. 进度（2026-10-17 晚）：功能一 **M0/T1/T2/T3/T4/T5 完成**（未验：Windows 实机、子代理锚定 E1、resume F1）；
+   功能二 **实现+单测 30/30、bundle 已装、真实会话 E2E 成功**（取消并删 goal 路径，状态文件 action=cancel/cleared=true）；
+   功能三/四 **设计+计划已落盘，待提交后实现**。
 3. 任何新增「待裁定」先做口径溯源并落盘，已有裁定不重复问（见 `docs/AGENTS.md` §二）。
 4. 用户 2026-10-17 已授权本阶段 `git commit` + push 到 `git@github.com:c1589190/DSHOptimizeMosire.git`（main）。

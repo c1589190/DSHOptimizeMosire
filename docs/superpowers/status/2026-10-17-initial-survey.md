@@ -88,3 +88,29 @@
 ### 仓库
 - 远程：`git@github.com:c1589190/DSHOptimizeMosire.git`（main）；已推送至 `485b067` 之后若干提交。
 - 证据：`.superpowers/sdd/2026-10-17-liangshen-anchored/`（本机留痕，不进 git）。
+
+## 八、实现进度（2026-10-17 晚）
+
+### 已完成
+- **功能一 T4 Windows 后台任务完成**：`custom-bash.mjs` 增加 `backgroundJobs`（默认 false，开启时 `run_in_background`
+  经 `ctx.jobs` 注册、`job_output`/`job_kill` 消费、apply 期 fail-fast）；新增 18 项单测，包内 45/45 通过。
+  **Windows 行为未实机验证**（本机 Linux），代码/README 已标注；默认关闭，锚定首轮 wire 不受影响。
+- **功能二实现 + 真实 E2E 成功**：host 插件 `packages/dsh-goal-confirm`（286 行）+ 30/30 单测；
+  bundle 已安装并激活（`~/.dsh/goal-confirm-status.json` `activated:true`）。
+  真实 E2E（本次会话 2026-10-17）：goal 自动续轮时 Web 端出现官方确认卡片，用户点「取消并删除 goal」→
+  状态文件 `{"round":1,"action":"cancel","outcome":"answer","cleared":true}`，goal 被清除、驱动丢弃本轮。
+  用户反馈：「goal机制的测试很成功，留着吧」。未验：30s 超时自动继续、关闭卡片路径、后台会话路径。
+- **功能三调研完成**：`docs/agents/03-调研-子Agent访问.md`（427 个子会话实测 + 父→子控制面被 Team 遮蔽的
+  E2E 铁证 + 优化候选 R1–R4）；设计/计划已落盘（spec/plan + 决策记录 S-001…S-005）。
+- **功能四设计完成**：空系统提示词预设设计/计划（D-007…D-009），待实现。
+- 三个子 Agent 交付：goal-confirm 实现+单测（30/30）、goal-confirm 元数据文档、T4（45/45）；Lead 已集成验证。
+
+### 未验证 / 待做
+- 功能一：E1 子代理锚定、F1 resume 重启、H Windows 实机（三项仍未验，如实保留）。
+- 功能二：30s 超时自动继续 / 关闭卡片 / 后台无浏览器连接三条路径未实测。
+- 功能三：M1 三工具尚未实现；M2（liangshen 子 Agent 锚定语义 A/B/C 实验）未开始。
+- 功能四：待实现 + 真实 wire 验证（需用户新建会话选择预设）。
+- 本机 427 个子会话语料中**没有 liangshen 子会话**，功能一子代理证据需新会话补齐。
+
+### 仓库
+- 2026-10-17 晚本轮提交：功能二 bundle + 功能一 T4 + 调研 03 + 功能三/四 spec/plan/决策记录（随本轮 commit 推送）。
