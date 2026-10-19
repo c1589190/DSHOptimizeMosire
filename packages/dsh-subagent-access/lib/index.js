@@ -86,6 +86,26 @@ const MESSAGE_OUTPUT_SCHEMA = {
   },
 }
 
+const LAST_MESSAGE_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    role: { type: 'string', required: true },
+    text: { type: 'string', required: true },
+    time: { type: 'number', required: true },
+  },
+}
+
+const WAIT_OUTPUT_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    status: { type: 'string', required: true, enum: ['inactive', 'timeout'] },
+    childId: { type: 'string', required: true },
+    lastMessage: LAST_MESSAGE_SCHEMA,
+  },
+}
+
 const INTERRUPT_OUTPUT_SCHEMA = {
   type: 'object',
   additionalProperties: false,
@@ -127,12 +147,40 @@ function toJsonSchema(spec) {
  * ships `@deepseek-ai/dsh-tools` in the dsh dependency tree, and this package
  * only needs the plain definition object the registry accepts.
  */
+/** Compile one compact value spec into the JSON Schema the registry accepts. */
+function compileSchema(spec) {
+  if (spec === null || typeof spec !== 'object' || Array.isArray(spec)) return spec
+  const result = {}
+  if (typeof spec.type === 'string') result.type = spec.type
+  if (typeof spec.description === 'string') result.description = spec.description
+  if (Array.isArray(spec.enum)) result.enum = spec.enum
+  if (spec.type === 'array' && spec.items !== undefined) result.items = compileSchema(spec.items)
+  if (spec.properties !== undefined && spec.properties !== null) {
+    const properties = {}
+    const required = []
+    for (const [key, meta] of Object.entries(spec.properties)) {
+      const property = compileSchema(meta)
+      if (property !== null && typeof property === 'object') delete property.required
+      properties[key] = property
+      if (meta !== null && typeof meta === 'object' && meta.required === true) required.push(key)
+    }
+    result.type = 'object'
+    result.properties = properties
+    if (required.length > 0) result.required = required
+    result.additionalProperties = spec.additionalProperties ?? false
+  }
+  return result
+}
+
 function defineTool(options) {
   return {
     name: options.name,
     description: options.description,
     parameters: toJsonSchema(options.parameters),
-    output: options.output,
+    output: {
+      schema: compileSchema(options.output.schema),
+      render: options.output.render,
+    },
     execute: options.execute,
   }
 }
@@ -165,14 +213,97 @@ function readService(ctx, key) {
   return ctx[key]
 }
 
+function abortError(signal) {
+  return signal?.reason instanceof Error ? signal.reason : new Error('aborted')
+}
+
+/** Wait for one live Agent to finish its current turn (or time out). */
+function waitForIdle(child, agents, childId, timeoutSeconds, signal) {
+  return new Promise((resolve, reject) => {
+    let settled = false
+    let timer
+    const finish = (value, error) => {
+      if (settled) return
+      settled = true
+      if (timer !== undefined) clearTimeout(timer)
+      signal?.removeEventListener?.('abort', onAbort)
+      if (error !== undefined) reject(error)
+      else resolve(value)
+    }
+    const onAbort = () => finish(undefined, abortError(signal))
+    if (signal?.aborted === true) {
+      onAbort()
+      return
+    }
+    signal?.addEventListener?.('abort', onAbort, { once: true })
+    if (timeoutSeconds > 0) timer = setTimeout(() => finish('timeout'), timeoutSeconds * 1000)
+    const wait = typeof child.whenIdle === 'function'
+      ? child.whenIdle()
+      : pollUntilIdle(agents, childId, signal)
+    Promise.resolve(wait).then(() => finish('inactive'), (error) => finish(undefined, error))
+  })
+}
+
+/** Poll a child's live status when the Agent has no whenIdle() helper. */
+async function pollUntilIdle(agents, childId, signal) {
+  for (;;) {
+    const agent = agents.get(childId)
+    if (agent === undefined || agent.status === 'idle') return
+    await new Promise((resolve, reject) => {
+      const timer = setTimeout(resolve, 500)
+      const onAbort = () => { clearTimeout(timer); reject(abortError(signal)) }
+      if (signal?.aborted === true) onAbort()
+      else signal?.addEventListener?.('abort', onAbort, { once: true })
+    })
+  }
+}
+
+/** Read one child's session events from the live store or a persisted snapshot. */
+async function readChildEvents(ctx, childId) {
+  const sessions = readService(ctx, 'sessions')
+  const live = sessions?.get?.(childId)
+  if (live !== undefined && typeof live.snapshotEvents === 'function') {
+    try {
+      return live.snapshotEvents()
+    } catch {
+      // Fall through to the query service.
+    }
+  }
+  const query = readService(ctx, 'sessionQuery')
+  if (query !== undefined && typeof query.readSession === 'function') {
+    try {
+      const snapshot = await query.readSession(childId)
+      return snapshot?.events
+    } catch {
+      return undefined
+    }
+  }
+  return undefined
+}
+
+/** Select the last non-empty assistant message from a child's events. */
+function lastAssistantMessage(events) {
+  if (!Array.isArray(events)) return null
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    const event = events[index]
+    if (event?.type !== 'assistant/message') continue
+    const blocks = event.data?.message?.content
+    if (!Array.isArray(blocks)) continue
+    const text = blocks.filter((block) => block?.type === 'text').map((block) => block.text).join('')
+    if (text.trim() === '') continue
+    return { role: 'assistant', text, time: event.time }
+  }
+  return null
+}
+
 /**
- * Install the three tools into one exact Agent scope.
+ * Install the four tools into one exact Agent scope.
  * @param agent - live Agent owning the target scope.
  * @param agents - `ctx.agents` service for live status.
  * @param subagents - `ctx.subagents` service for listing, delivery, and interruption.
  * @returns disposer releasing every tool registered by this call.
  */
-function install(agent, agents, subagents) {
+function install(ctx, agent, agents, subagents) {
   const registry = agent.ctx.tools
   const disposers = []
   const register = (definition) => {
@@ -233,6 +364,45 @@ function install(agent, agents, subagents) {
         const previousStatus = agents.get(args.child_id)?.status === 'running' ? 'running' : 'inactive'
         subagents.interrupt(args.child_id, { kind: 'ancestor', agent: caller })
         return { previousStatus }
+      },
+    }))
+    register(defineTool({
+      name: 'subagent_wait',
+      description: 'Wait for a direct child sub-agent to stop (become idle), then return its final assistant message. Use this after spawning a background child or after subagent_message when the child result is needed in the same step. Blocks the calling step until the child stops; timeout_seconds bounds the wait (0 or omitted waits indefinitely).',
+      parameters: {
+        child_id: {
+          type: 'string',
+          required: true,
+          description: 'Direct-child session id from subagent_list.',
+        },
+        timeout_seconds: {
+          type: 'number',
+          description: 'Optional maximum wait in seconds; 0 or omitted waits indefinitely.',
+        },
+      },
+      output: jsonOutput(WAIT_OUTPUT_SCHEMA),
+      async execute(args, exec) {
+        const caller = callingAgent(exec.agent, 'subagent_wait')
+        const timeoutSeconds = args.timeout_seconds === undefined ? 0 : args.timeout_seconds
+        if (typeof timeoutSeconds !== 'number' || !Number.isFinite(timeoutSeconds) || timeoutSeconds < 0) {
+          throw new Error('subagent_wait: timeout_seconds must be a non-negative number')
+        }
+        const children = await subagents.listChildren(caller.session.id, exec.signal)
+        if (!Array.isArray(children) || !children.some((entry) => entry?.id === args.child_id)) {
+          throw new Error(`subagent_wait: "${args.child_id}" is not a direct child of this session`)
+        }
+        const child = agents.get(args.child_id)
+        const outcome = child === undefined
+          ? 'inactive'
+          : await waitForIdle(child, agents, args.child_id, timeoutSeconds, exec.signal)
+        if (outcome === 'timeout') return { status: 'timeout', childId: args.child_id }
+        const events = await readChildEvents(ctx, args.child_id)
+        const lastMessage = lastAssistantMessage(events)
+        return {
+          status: 'inactive',
+          childId: args.child_id,
+          ...(lastMessage === null ? {} : { lastMessage }),
+        }
       },
     }))
   } catch (error) {
@@ -309,7 +479,7 @@ export function apply(ctx, config) {
       return
     }
     try {
-      installed.set(agent, install(agent, agents, subagents))
+      installed.set(agent, install(ctx, agent, agents, subagents))
       writeStatus()
     } catch (error) {
       warn(`could not install tools for agent "${agentId(agent) ?? 'unknown'}": ${String(error?.message ?? error)}`)

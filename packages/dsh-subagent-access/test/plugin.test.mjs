@@ -14,11 +14,11 @@ const statusPath = join(statusHome, 'subagent-access-status.json')
 const signal = new AbortController().signal
 
 /** Minimal Cordis context: capture listeners/effects, serve the two services. */
-function makeCtx({ agents, subagents, logger } = {}) {
+function makeCtx({ agents, subagents, sessions, logger } = {}) {
   const onCalls = []
   const listeners = new Map()
   const effects = []
-  const services = { agents, subagents }
+  const services = { agents, subagents, sessions }
   return {
     onCalls,
     listeners,
@@ -40,12 +40,13 @@ function makeCtx({ agents, subagents, logger } = {}) {
 }
 
 /** Fake Agent: records every tool definition registered in its scope. */
-function makeAgent({ id = 'session-root', delegationDepth = 0, status = 'idle' } = {}) {
+function makeAgent({ id = 'session-root', delegationDepth = 0, status = 'idle', whenIdle } = {}) {
   const tools = new Map()
   const registrations = []
   return {
     id,
     status,
+    whenIdle: whenIdle ?? (() => Promise.resolve()),
     session: { id, header: { delegationDepth } },
     tools,
     registrations,
@@ -84,6 +85,17 @@ function makeAgents(initial = []) {
   }
 }
 
+/** Fake `ctx.sessions`: map child id -> event array. */
+function makeSessions(eventsById = {}) {
+  return {
+    get(id) {
+      const events = eventsById[id]
+      if (events === undefined) return undefined
+      return { snapshotEvents: () => events }
+    },
+  }
+}
+
 /** Fake `ctx.subagents`: records exact calls; `hooks` override one method. */
 function makeSubagents({ children = [], hooks = {} } = {}) {
   const calls = { listChildren: [], sendMessage: [], interrupt: [] }
@@ -117,7 +129,8 @@ function makeHarness(options = {}) {
   const child = makeAgent({ id: 'session-child', delegationDepth: 1 })
   const agents = 'agents' in options ? options.agents : makeAgents([root, child])
   const subagents = 'subagents' in options ? options.subagents : makeSubagents()
-  const ctx = makeCtx({ agents, subagents, logger: options.logger })
+  const sessions = 'sessions' in options ? options.sessions : makeSessions()
+  const ctx = makeCtx({ agents, subagents, sessions, logger: options.logger })
   apply(ctx, options.config ?? {})
   return { ctx, agents, subagents, root, child }
 }
@@ -132,10 +145,10 @@ function readStatus() {
   return JSON.parse(readFileSync(statusPath, 'utf8'))
 }
 
-test('activation installs the three tools in root scopes only and records status', () => {
+test('activation installs the four tools in root scopes only and records status', () => {
   const { ctx, root, child } = makeHarness()
 
-  assert.deepEqual([...root.tools.keys()], ['subagent_list', 'subagent_message', 'subagent_interrupt'])
+  assert.deepEqual([...root.tools.keys()], ['subagent_list', 'subagent_message', 'subagent_interrupt', 'subagent_wait'])
   assert.equal(child.tools.size, 0, 'a delegated scope is not a default target')
   assert.deepEqual(ctx.onCalls.map((call) => call.event), ['agent/created', 'agent/disposed'])
   assert.equal(ctx.effects.length, 1)
@@ -146,15 +159,15 @@ test('activation installs the three tools in root scopes only and records status
   assert.equal(status.pid, process.pid)
   assert.deepEqual(status.config, { enabled: true, includeDelegatedAgents: false })
   assert.deepEqual(status.installed, ['session-root'])
-  assert.deepEqual(status.tools, ['subagent_list', 'subagent_message', 'subagent_interrupt'])
+  assert.deepEqual(status.tools, ['subagent_list', 'subagent_message', 'subagent_interrupt', 'subagent_wait'])
   assert.ok(Date.parse(status.at) > 0)
 })
 
 test('includeDelegatedAgents extends installation to delegated scopes', () => {
   const { root, child } = makeHarness({ config: { includeDelegatedAgents: true } })
 
-  assert.equal(root.tools.size, 3)
-  assert.equal(child.tools.size, 3)
+  assert.equal(root.tools.size, 4)
+  assert.equal(child.tools.size, 4)
   assert.deepEqual(readStatus().installed, ['session-root', 'session-child'])
 })
 
@@ -167,8 +180,8 @@ test('agent/created installs for a new target and repeated events do not duplica
   created({ agent: late })
   created({ agent: late })
 
-  assert.equal(late.tools.size, 3)
-  assert.equal(late.registrations.length, 3, 'each tool must be registered exactly once')
+  assert.equal(late.tools.size, 4)
+  assert.equal(late.registrations.length, 4, 'each tool must be registered exactly once')
   assert.deepEqual(readStatus().installed, ['session-root', 'session-late'])
 })
 
@@ -378,4 +391,70 @@ test('invalid config throws at activation and installs nothing', () => {
   assert.throws(() => apply(ctx, { typo: true }), /unknown config key/)
   assert.equal(root.tools.size, 0)
   assert.equal(ctx.onCalls.length, 0)
+})
+
+/** One child catalog entry used by the wait tests. */
+const childCatalog = { id: 'session-child', createdAt: 1, mode: 'continuable' }
+
+function waitHarness({ child, events } = {}) {
+  const root = makeAgent({ id: 'session-root' })
+  const target = child ?? makeAgent({ id: 'session-child', delegationDepth: 1 })
+  const agents = makeAgents([root, target])
+  const subagents = makeSubagents({ children: [childCatalog] })
+  const sessions = makeSessions({ 'session-child': events ?? [] })
+  const ctx = makeCtx({ agents, subagents, sessions })
+  apply(ctx, {})
+  return { ctx, agents, subagents, sessions, root, target }
+}
+
+const assistantMessage = (seq, time, text) => ({
+  type: 'assistant/message', seq, time,
+  data: { message: { role: 'assistant', content: [{ type: 'text', text }] } },
+})
+
+test('subagent_wait returns the child final assistant message when already idle', async () => {
+  const { root } = waitHarness({ events: [assistantMessage(1, 111, 'child final answer')] })
+  const result = await executeTool(root, 'subagent_wait', { child_id: 'session-child' })
+  assert.deepEqual(result, {
+    status: 'inactive',
+    childId: 'session-child',
+    lastMessage: { role: 'assistant', text: 'child final answer', time: 111 },
+  })
+})
+
+test('subagent_wait blocks until the child becomes idle', async () => {
+  let release
+  const idle = new Promise((resolve) => { release = resolve })
+  const child = makeAgent({ id: 'session-child', delegationDepth: 1, whenIdle: () => idle })
+  const { root } = waitHarness({ child, events: [assistantMessage(1, 222, 'done later')] })
+  let settled = false
+  const pending = executeTool(root, 'subagent_wait', { child_id: 'session-child' }).then((value) => {
+    settled = true
+    return value
+  })
+  await new Promise((resolve) => setTimeout(resolve, 10))
+  assert.equal(settled, false, 'the tool must wait while the child runs')
+  release()
+  const result = await pending
+  assert.equal(result.status, 'inactive')
+  assert.equal(result.lastMessage.text, 'done later')
+})
+
+test('subagent_wait honours timeout_seconds while the child keeps running', async () => {
+  const child = makeAgent({
+    id: 'session-child',
+    delegationDepth: 1,
+    whenIdle: () => new Promise(() => {}),
+  })
+  const { root } = waitHarness({ child })
+  const result = await executeTool(root, 'subagent_wait', { child_id: 'session-child', timeout_seconds: 0.01 })
+  assert.deepEqual(result, { status: 'timeout', childId: 'session-child' })
+})
+
+test('subagent_wait rejects a session that is not a direct child', async () => {
+  const { root } = waitHarness()
+  await assert.rejects(
+    executeTool(root, 'subagent_wait', { child_id: 'session-stranger' }),
+    /not a direct child/,
+  )
 })

@@ -88,6 +88,6 @@ test('shouldInstall honors includeDelegatedAgents and enabled', () => {
 })
 
 test('TOOL_NAMES is the fixed, collision-free registration order', () => {
-  assert.deepEqual([...TOOL_NAMES], ['subagent_list', 'subagent_message', 'subagent_interrupt'])
+  assert.deepEqual([...TOOL_NAMES], ['subagent_list', 'subagent_message', 'subagent_interrupt', 'subagent_wait'])
   assert.equal(Object.isFrozen(TOOL_NAMES), true)
 })

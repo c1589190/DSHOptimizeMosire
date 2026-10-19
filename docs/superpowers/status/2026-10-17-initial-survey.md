@@ -219,3 +219,16 @@
   Chat 三个 timing 槽注册 active。
 - **待验**：用户新开梁神/空预设会话确认四功能同时生效；旧会话不追溯。
 - 设计/决策：`.agents/notes/implemented/2026-10-19-dshom-consolidation.md`。
+
+## 十五、2026-10-19：父→子 Agent 新增 `subagent_wait`
+
+- 用户要求：子 Agent 组件增加一个「主动等待子 Agent 停下、自动返回最后一条消息」的工具。
+- 实现（`packages/dsh-subagent-access`）：新增 `subagent_wait`（第 4 个工具）：
+  - 先经 `subagents.listChildren` 校验目标为**直接子会话**；
+  - 对 live child 执行 `await child.whenIdle()`（无 `whenIdle` 时按 500ms 轮询状态兜底）；`timeout_seconds` 可选，0/省略=无限等待；
+  - 父会话 `exec.signal` 中止时立刻退出等待；
+  - 子 Agent 停下后从 live `ctx.sessions`（或 `sessionQuery.readSession`）读取事件，返回最后一条**非空 assistant 消息**（role/text/time）；超时返回
+    `{status:'timeout', childId}`；
+  - 本地 `defineTool` 现在会把紧凑 output spec 编译成 JSON Schema（0.2.1 无 `@deepseek-ai/dsh-tools` 依赖）。
+- 单测：subagent-access 32/32（新增 idle 返回、阻塞等待、超时、非直接子会话拒绝）；其余包 76/76、30/30。
+- 生效：`@mosire/dshom` 通过相对路径调用该模块；当前 Host 已加载旧模块，**需重启 DSH** 后新会话才有 `subagent_wait`。

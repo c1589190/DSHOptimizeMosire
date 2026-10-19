@@ -11,9 +11,9 @@
 /**
  * Model-facing tool names installed into each target Agent scope, in
  * registration order. None of them collides with an Agent Team tool.
- * @type {readonly ['subagent_list', 'subagent_message', 'subagent_interrupt']}
+ * @type {readonly ['subagent_list', 'subagent_message', 'subagent_interrupt', 'subagent_wait']}
  */
-export const TOOL_NAMES = Object.freeze(['subagent_list', 'subagent_message', 'subagent_interrupt'])
+export const TOOL_NAMES = Object.freeze(['subagent_list', 'subagent_message', 'subagent_interrupt', 'subagent_wait'])
 
 /** Defaults for the two supported configuration keys. */
 const DEFAULTS = Object.freeze({ enabled: true, includeDelegatedAgents: false })
@@ -59,7 +59,7 @@ export function normalizeConfig(config) {
  * A disabled plugin installs nothing regardless.
  * @param {unknown} agent - live Agent (or a test double) with a session header.
  * @param {{enabled?: boolean, includeDelegatedAgents?: boolean}} config - resolved or raw config.
- * @returns {boolean} whether this scope receives the three tools.
+ * @returns {boolean} whether this scope receives the tools.
  */
 export function shouldInstall(agent, config) {
   const resolved = config ?? {}

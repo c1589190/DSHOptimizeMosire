@@ -26,8 +26,9 @@
   - **功能二 · goal 续轮确认门**：goal 自动续轮注入时，Web UI 弹显式确认（确认→继续 / 取消→删除 goal / 30s 可配置无操作→继续）。
     调研结论：可用 host 插件在 `agent/pre-step`（prepend）扣住 + 复用官方 `ctx.userQuestions` 卡片 UI，**不改 DSH 源码**。
   - **功能三 · 子 Agent 访问（父 → 子控制面）**：Web profile 顶层会话的 Team 同名工具遮蔽了普通子会话的控制面
-    （E2E 证据见 `docs/agents/03-…`）。独立 host 插件补 `subagent_list` / `subagent_message` / `subagent_interrupt`
-    三个工具，只调官方 `ctx.subagents` / `ctx.agents`；M2（liangshen 子 Agent 锚定语义）只做实验设计。
+    （E2E 证据见 `docs/agents/03-…`）。host 插件补 `subagent_list` / `subagent_message` / `subagent_interrupt` /
+    `subagent_wait` 四个工具（wait 阻塞到子 Agent 停下并返回最后一条 assistant 消息），只调官方
+    `ctx.subagents` / `ctx.agents`；M2（liangshen 子 Agent 锚定语义）只做实验设计。
   - **功能四 · 空系统提示词预设**：新增第二预设 `liangshen-empty-system`——梁神模式但系统提示词替换为单个 ASCII 空格，其余完全一致。
   - **功能五 · 压缩后恢复 hint**：`compaction/end` 后额外注入一条恢复 hint（提醒重读 AGENTS.md/CLAUDE.md、定位仓库根、恢复 status/handoff、
     用 `skill_search`/`skill_load` 恢复技能环境）；纯提示、不注入文件内容、不回挂官方注入源。裁定见 D-011~D-014。
@@ -130,8 +131,8 @@ D-004=沿用「梁神模式」/ order 5 / MIT；D-005=协议级 smoke + 12 会�
 
 **功能二（goal 续轮确认门）**：G-001=A 官方提问卡片；G-002=A 全局挂载；G-003=A 关闭卡片=取消并删 goal；G-004=A 独立 bundle。
 
-**功能三（子 Agent 访问）**：S-001=M1 只做父→子控制面三工具（M2 锚定语义实验只设计）；S-002=独立 bundle `@mosire/dsh-subagent-access`；
-S-003=三工具 `subagent_list`/`subagent_message`/`subagent_interrupt`、默认只装 root、不加 prompt section；
+**功能三（子 Agent 访问）**：S-001=M1 只做父→子控制面工具（list/message/interrupt/wait；M2 锚定语义实验只设计）；S-002=独立 bundle `@mosire/dsh-subagent-access`；
+S-003=四工具 `subagent_list`/`subagent_message`/`subagent_interrupt`/`subagent_wait`（wait 由用户 2026-10-19 追加，D-021）、默认只装 root、不加 prompt section；
 S-004=只调官方 `ctx.subagents`/`ctx.agents`，不改 Team、不复制 DSH 源码；S-005=v1 不做 Team 成员过滤（已知限制，M2 再定）。
 
 **功能四（空系统提示词预设）**：D-007=新增独立第二预设 `liangshen-empty-system`（order 6），主预设零改动；
@@ -149,6 +150,10 @@ D-019=运行中实时计时用 LiveTiming overlay（composer.dock；只读行 DO
 **统一交付（2026-10-19）**：D-020=六个功能收进单一 bundle `@mosire/dshom`（Host 入口组合各实现模块 + Client half 时间标注），
 profile 只启用 dshom；`config.features` 可逐项关闭；旧包只作 workspace 内部实现/测试。
 
+**子 Agent 等待工具（2026-10-19）**：D-021=新增 `subagent_wait`：校验直接子会话后 `await child.whenIdle()`（可选 `timeout_seconds`，
+超时返回 `status:"timeout"`），随后从 live session / sessionQuery 读取该子会话事件，返回最后一条非空 assistant 消息；
+父会话中断信号会中止等待。
+
 **当前门禁（必须遵守）**：
 1. 功能一/二 spec 与计划已获用户批准并已提交；功能三/四 设计已定（用户 2026-10-17「出设计，提交并推送，然后开始实现」授权直接实现）。
 2. 进度（2026-10-17 深夜）：功能一 **M0/T1/T2/T3/T4/T5 完成**（未验：Windows 实机、子代理锚定 E1、resume F1）；
@@ -163,6 +168,7 @@ profile 只启用 dshom；`config.features` 可逐项关闭；旧包只作 works
    **用户已确认**：真实工具运行（`sleep 5`，22:21:30–35）期间命令右侧出现实时计时标签。
    2026-10-19：DSH 升级 0.2.1-rc.2 后修复 peer relink（`9daa47e`），并将六个功能统一安装为 `@mosire/dshom`（D-020）；
    两预设 `broken:null`、goal-confirm/subagent-access 均 activated；待用户新会话验收四功能同启。
+   2026-10-19：`subagent-access` 新增 `subagent_wait`（D-021）；单测 32/32；等待 DSH 重启后对新会话生效。
    功能五（2026-10-17）：**已实现并实机通过**（`instruction-hint` epoch 感知 recovery + `context-gate.allowKinds`；单测 liangshen 76/76）；用户重启后会话 `session-aa65c681…`：压缩@104 → recovery-hint@111 → 首请求 tools=2 → 模型重读 AGENTS.md@116，verifier exit=0。证据本机 `.superpowers/sdd/2026-10-17-compaction-recovery-hint/`；空预设未单独跑 recovery。
 3. 任何新增「待裁定」先做口径溯源并落盘，已有裁定不重复问（见 `docs/AGENTS.md` §二）。
 4. 用户 2026-10-17 已授权本阶段 `git commit` + push 到 `git@github.com:c1589190/DSHOptimizeMosire.git`（main）。

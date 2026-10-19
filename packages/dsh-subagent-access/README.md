@@ -1,7 +1,7 @@
 # @mosire/dsh-subagent-access
 
 子 Agent 访问（功能三 M1）：在**顶层会话**补回「父 → 子」控制面。
-三个工具只调用官方 `ctx.subagents` 服务与 `ctx.agents` 状态，不复制 DSH 源码、
+四个工具只调用官方 `ctx.subagents` 服务与 `ctx.agents` 状态，不复制 DSH 源码、
 不改 Agent Team 行为。
 
 ## 为什么需要它
@@ -10,13 +10,14 @@ Web profile 在 host 层全局挂载 Agent Team，其 `send_message` / `list_age
 `interrupt_agent` 只认 Team 的 lead 与 active teammate（证据见
 `docs/agents/03-调研-子Agent访问.md` §2.2）。普通 `subagent` / `subagent_fork`
 子会话不是 Team 成员，于是顶层会话能派子会话，却**列不出、发不进、停不下**。
-本包用**不与 Team 重名**的三个工具补上这条路径：
+本包用**不与 Team 重名**的四个工具补上这条路径：
 
 | 工具 | 做什么 | 参数 | 返回 |
 |---|---|---|---|
 | `subagent_list` | 列出本会话启动的直接子会话；id / 可选 label / 生命周期模式 / 实时状态 | 无 | `{children:[{id,label?,mode,status,createdAt}]}` |
 | `subagent_message` | 给本会话启动的子会话发一条后续消息；运行中的子会话在最近 step 边界收到，idle 的 continuable 子会话启动新回合，one-shot 不可续 | `child_id`、`message`（均必填） | `{messageId}` |
 | `subagent_interrupt` | 中断本会话启动的子会话当前回合；子会话保留可继续，其后代继续运行 | `child_id`（必填） | `{previousStatus:"running"\|"inactive"}` |
+| `subagent_wait` | 阻塞等待直接子会话停下（`whenIdle()`），然后返回其最后一条非空 assistant 消息；可选超时 | `child_id`（必填）、`timeout_seconds`（可选，0/省略=无限） | `{status:"inactive"\|"timeout",childId,lastMessage?:{role,text,time}}` |
 
 - 状态只有两档：`running` = 该 Agent 正在执行回合；其余（idle、已释放、从未驻留）
   一律 `inactive`。
@@ -91,7 +92,7 @@ node --test test/*.test.mjs
 ```
 
 单测覆盖：安装目标筛选（root / delegated / `includeDelegatedAgents`）、
-`enabled:false`、三工具的 execute 参数与返回值、错误透传、`agent/created` /
+`enabled:false`、四工具的 execute 参数与返回值、错误透传、`agent/created` /
 `agent/disposed` 与插件卸载的 disposer 释放、`subagents` 缺失 fail-open。
 **实现方只跑了单测；bundle 安装与真实会话 E2E 由 Lead 按
 `docs/superpowers/plans/2026-10-17-subagent-access.md` Task 4 执行**，

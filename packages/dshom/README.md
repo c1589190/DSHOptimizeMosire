@@ -6,7 +6,7 @@ DSH Optimize Mosire 的**唯一入口 bundle**：把此前分开安装/启用的
 |---|---|---|
 | 梁神模式（锚定预设，含空系统提示词变体、压缩后恢复 hint） | `../dsh-liangshen-anchored/lib/index.js` | 开 |
 | goal 续轮确认门 | `../dsh-goal-confirm/lib/index.js` | 开 |
-| 父→子 Agent 控制工具（`subagent_list/message/interrupt`） | `../dsh-subagent-access/lib/index.js` | 开 |
+| 父→子 Agent 控制工具（`subagent_list/message/interrupt/wait`） | `../dsh-subagent-access/lib/index.js` | 开 |
 | 聊天时间标注（运行中实时 + 完成后） | `./client.js` | 开 |
 
 Host 入口按需调用各功能的既有 `apply`，不复制业务代码；预设组合仍位于
