@@ -20,7 +20,7 @@
  *
  * Usage: node tools/link-dsh-peers.mjs [--dsh-root <path>]
  */
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, symlinkSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -89,15 +89,101 @@ function referencedNames(packageDir) {
   return [...names].sort()
 }
 
+/**
+ * Find the running DSH installation's package directory.
+ *
+ * DSH installs two layouts in practice:
+ *  - npm-style: `<install>/node_modules/@deepseek-ai/dsh`, with peers nested at
+ *    `<dsh>/node_modules/@deepseek-ai/*`;
+ *  - pnpm-style: `<global>/node_modules/@deepseek-ai/dsh` (a symlink into
+ *    `.pnpm/...`), with peers as SIBLINGS of the dsh package under the same
+ *    `@deepseek-ai/` directory.
+ * The peer source is therefore either the nested path or the dsh package's
+ * parent; pick whichever actually contains an official peer package.
+ */
+function peerSourceRoot(dshRoot) {
+  let realRoot = dshRoot
+  try {
+    realRoot = realpathSync(dshRoot)
+  } catch {
+    // Keep the unresolved path; candidates below still degrade usefully.
+  }
+  const candidates = [
+    join(realRoot, 'node_modules', '@deepseek-ai'),
+    dirname(realRoot),
+    join(dshRoot, 'node_modules', '@deepseek-ai'),
+    dirname(dshRoot),
+  ]
+  for (const candidate of candidates) {
+    if (existsSync(join(candidate, 'dsh-persona', 'package.json'))) return candidate
+  }
+  return candidates.find((candidate) => existsSync(candidate))
+}
+
+/** Locate the running `dsh` Host process on Linux via /proc (preferred). */
+function runningDshRoot() {
+  if (process.platform !== 'linux') return undefined
+  let pids
+  try {
+    pids = readdirSync('/proc')
+  } catch {
+    return undefined
+  }
+  for (const pid of pids) {
+    if (!/^\d+$/.test(pid)) continue
+    try {
+      const cmdline = readFileSync(`/proc/${pid}/cmdline`, 'utf8')
+      const match = /(\/[^\0 ]*?\/node_modules\/@deepseek-ai\/dsh)\/lib\/bin\.js/.exec(cmdline)
+      if (match) return match[1]
+    } catch {
+      // Process vanished or is unreadable; continue.
+    }
+  }
+  return undefined
+}
+
+/** Fallback: the newest @deepseek-ai/dsh package under the pnpm global store. */
+function pnpmGlobalDshRoot() {
+  const home = process.env.HOME
+  if (home === undefined) return undefined
+  const globalDir = join(home, '.local', 'share', 'pnpm', 'global', 'v11')
+  let entries
+  try {
+    entries = readdirSync(globalDir)
+  } catch {
+    return undefined
+  }
+  let best
+  for (const entry of entries) {
+    const candidate = join(globalDir, entry, 'node_modules', '@deepseek-ai', 'dsh')
+    try {
+      if (!existsSync(join(candidate, 'package.json'))) continue
+      const mtime = statSync(join(candidate, 'package.json')).mtimeMs
+      if (best === undefined || mtime > best.mtime) best = { candidate, mtime }
+    } catch {
+      // ignore unreadable store entry
+    }
+  }
+  return best?.candidate
+}
+
 const argIndex = process.argv.indexOf('--dsh-root')
 let dshRoot = argIndex >= 0 ? process.argv[argIndex + 1] : undefined
-if (dshRoot === undefined) {
+if (dshRoot === undefined) dshRoot = runningDshRoot() ?? pnpmGlobalDshRoot() ?? (() => {
   const require = createRequire(import.meta.url)
-  dshRoot = dirname(require.resolve('@deepseek-ai/dsh/package.json', { paths: [process.cwd(), '/usr/local/lib/node_modules', '/home/cna/.npm-global/lib/node_modules'] }))
+  try {
+    return dirname(require.resolve('@deepseek-ai/dsh/package.json', { paths: [process.cwd(), '/usr/local/lib/node_modules'] }))
+  } catch {
+    return undefined
+  }
+})()
+if (dshRoot === undefined) {
+  console.error('link-dsh-peers: cannot locate the DSH installation; pass --dsh-root <.../@deepseek-ai/dsh>')
+  process.exit(1)
 }
-const sourceRoot = join(dshRoot, 'node_modules', '@deepseek-ai')
-if (!existsSync(sourceRoot)) {
-  console.error(`link-dsh-peers: no @deepseek-ai packages under ${sourceRoot}; pass --dsh-root <dsh install directory>`)
+const sourceRoot = peerSourceRoot(dshRoot)
+if (sourceRoot === undefined) {
+  console.error(`link-dsh-peers: no @deepseek-ai peer packages found for ${dshRoot}; pass --dsh-root <.../@deepseek-ai/dsh>`)
   process.exit(1)
 }
 
