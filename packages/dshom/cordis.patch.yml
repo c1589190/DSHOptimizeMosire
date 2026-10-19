@@ -1,0 +1,5 @@
+# One bundle for the whole dshom feature set. The Host entry composes the
+# feature modules below; the Client entry is the chat timing annotation UI.
+- insert:
+    - id: dshom
+      name: '@mosire/dshom'

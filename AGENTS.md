@@ -31,9 +31,11 @@
   - **功能四 · 空系统提示词预设**：新增第二预设 `liangshen-empty-system`——梁神模式但系统提示词替换为单个 ASCII 空格，其余完全一致。
   - **功能五 · 压缩后恢复 hint**：`compaction/end` 后额外注入一条恢复 hint（提醒重读 AGENTS.md/CLAUDE.md、定位仓库根、恢复 status/handoff、
     用 `skill_search`/`skill_load` 恢复技能环境）；纯提示、不注入文件内容、不回挂官方注入源。裁定见 D-011~D-014。
-  - **功能六 · Chat 时间标注（Web UI 插件）**：独立 bundle `@mosire/dsh-timing-annotations`，只用 Chat 官方 additive slots
+  - **功能六 · Chat 时间标注（Web UI 插件）**：只用 Chat 官方 additive slots
     （`conversation.chat.assistant-actions` + `conversation.chat.turnTail`）显示每条 assistant 消息的开始时间/耗时，
-    以及每轮思考/工具命令的开始时间与耗时；不替换渲染器、不写 DOM。裁定见 D-017/D-018。
+    以及每轮思考/工具命令的开始时间与耗时；运行中由 LiveTiming overlay 实时显示。不替换渲染器、不写宿主 DOM。裁定见 D-017/D-018/D-019。
+- **交付形态（2026-10-19，D-020）**：以上六个功能统一由**单一 bundle `@mosire/dshom`** 提供（Host 入口按特性调用各实现模块；
+  Client half = 聊天时间标注）；旧 `@mosire/dsh-*` 包保留为实现/测试模块，profile 只启用 `dshom`。
 - 权威顺序：**用户原话 > 最新落盘文档 > 本文件 > `docs/agents/*.md` 长文 > 上游参考（DSH / TUI / dsh-web 的源码与 README）> 旧文档**。
 - 「当前状态」不抄在本文件：看 `docs/superpowers/status/` 最新一份 + `git log --oneline`。
 
@@ -144,6 +146,9 @@ D-008=生成器（`tools/sync-preset-variant.mjs`）+ 提交产物、单测防�
 不替换 Chat 渲染器、不写 DOM；D-018=保留 DSH 自带 Trajectory 视图作为现成能力，不二次开发；
 D-019=运行中实时计时用 LiveTiming overlay（composer.dock；只读行 DOM 对齐，不改宿主 DOM）。
 
+**统一交付（2026-10-19）**：D-020=六个功能收进单一 bundle `@mosire/dshom`（Host 入口组合各实现模块 + Client half 时间标注），
+profile 只启用 dshom；`config.features` 可逐项关闭；旧包只作 workspace 内部实现/测试。
+
 **当前门禁（必须遵守）**：
 1. 功能一/二 spec 与计划已获用户批准并已提交；功能三/四 设计已定（用户 2026-10-17「出设计，提交并推送，然后开始实现」授权直接实现）。
 2. 进度（2026-10-17 深夜）：功能一 **M0/T1/T2/T3/T4/T5 完成**（未验：Windows 实机、子代理锚定 E1、resume F1）；
@@ -154,9 +159,10 @@ D-019=运行中实时计时用 LiveTiming overlay（composer.dock；只读行 DO
    verifier exit=0：system 恰好一个空格、首请求双工具、零注入、晋升 48 工具）；仅空预设的**压缩重锚**未验（需 /compact）。
    功能一追补 **D-010**：liangshen 两预设的 `tool-subagent` 行已开 `modelSelectionSettings: true` + `agentOptions.reasoningEffort: high`，
    重挂载后 `broken:null`；真实「新会话按次换模型/档位」wire 待新会话验证（旧会话不追溯）。
-   功能六（2026-10-17）：bundle `@mosire/dsh-timing-annotations` 已安装；三个槽 occupants `active:true`；按用户追加要求增加
-   LiveTiming overlay（运行中实时 `开始 HH:MM · 已用 …`，D-019）；**用户已确认**：真实工具运行（`sleep 5`，22:21:30–35）期间
-   命令右侧出现实时计时标签。
+   功能六（2026-10-17）：三个 Chat 槽 occupants `active:true`；LiveTiming overlay（运行中实时 `开始 HH:MM · 已用 …`，D-019）；
+   **用户已确认**：真实工具运行（`sleep 5`，22:21:30–35）期间命令右侧出现实时计时标签。
+   2026-10-19：DSH 升级 0.2.1-rc.2 后修复 peer relink（`9daa47e`），并将六个功能统一安装为 `@mosire/dshom`（D-020）；
+   两预设 `broken:null`、goal-confirm/subagent-access 均 activated；待用户新会话验收四功能同启。
    功能五（2026-10-17）：**已实现并实机通过**（`instruction-hint` epoch 感知 recovery + `context-gate.allowKinds`；单测 liangshen 76/76）；用户重启后会话 `session-aa65c681…`：压缩@104 → recovery-hint@111 → 首请求 tools=2 → 模型重读 AGENTS.md@116，verifier exit=0。证据本机 `.superpowers/sdd/2026-10-17-compaction-recovery-hint/`；空预设未单独跑 recovery。
 3. 任何新增「待裁定」先做口径溯源并落盘，已有裁定不重复问（见 `docs/AGENTS.md` §二）。
 4. 用户 2026-10-17 已授权本阶段 `git commit` + push 到 `git@github.com:c1589190/DSHOptimizeMosire.git`（main）。

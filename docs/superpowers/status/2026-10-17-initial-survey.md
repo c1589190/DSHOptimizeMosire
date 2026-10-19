@@ -202,3 +202,20 @@
 - **实机确认（用户）**：`sleep 5`（22:21:30–35）运行期间，命令右侧出现实时 `开始 HH:MM · 已用 …` 标签并持续刷新——LiveTiming 工作正常。
 - **未验证**：深浅色主题、历史分页加载后的标注准确性未单独验；`assistant-actions` 位于宿主动作行，历史轮次可能 hover 才显示，常显信息以 turnTail 为准。
 - 设计：`docs/superpowers/specs/2026-10-17-chat-timing-annotations-design.md`；决策：`.agents/notes/implemented/2026-10-17-chat-timing-annotations.md`。
+
+## 十四、2026-10-19：DSH 0.2.1 升级修复 + 统一 bundle `@mosire/dshom`
+
+- **故障**：DSH 升级到 0.2.1-rc.2，安装迁到 pnpm global；梁神预设的 `@deepseek-ai/*` peer symlink 仍指向已删除的 npm-global 路径 →
+  26 个 row 全部 "never started"。
+- **修复（`9daa47e`）**：`tools/link-dsh-peers.mjs` 自动从运行中 Host（`/proc`）定位 dsh，按 pnpm 布局从 realpath 虚拟 store 取 peers，
+  重新链接 24 个包；`dsh-tool-ralph` 在 0.2.1 不再是 dsh 依赖 → 预设 row 改为可解析才启用；两预设恢复 `broken:null`。
+- **统一交付（D-020）**：新 bundle `packages/dshom`（`@mosire/dshom`）：
+  - Host 入口调用 `dsh-liangshen-anchored`、`dsh-goal-confirm`、`dsh-subagent-access` 的既有 `apply`；
+  - Client half 复制聊天时间标注（含 LiveTiming）；`config.features` 可逐项关闭；
+  - profile 只启用 `@mosire/dshom`（旧 @mosire bundle 已卸载/停用，依赖仍在但无 bundle）。
+  - `dsh-subagent-access` 去掉 0.2.1 缺失的 `@deepseek-ai/dsh-tools` 依赖，改为本地 schema/defineTool 等价实现。
+- **验证**：单测 liangshen 76/76、goal-confirm 30/30、subagent-access 28/28；`install_bundle` → applied；
+  `liangshen-anchored-status.json` 两预设 `broken:null`；goal-confirm activated；subagent-access activated；
+  Chat 三个 timing 槽注册 active。
+- **待验**：用户新开梁神/空预设会话确认四功能同时生效；旧会话不追溯。
+- 设计/决策：`.agents/notes/implemented/2026-10-19-dshom-consolidation.md`。

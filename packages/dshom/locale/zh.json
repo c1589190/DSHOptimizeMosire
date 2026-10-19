@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "DSH Optimize Mosire（dshom）",
+    "description": "一个 bundle 集成：梁神模式锚定预设（含空系统提示词变体与压缩恢复 hint）、goal 续轮确认门、父→子 Agent 控制工具、聊天时间标注（运行中实时 + 完成后标注）。"
+  }
+}

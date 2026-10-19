@@ -41,8 +41,6 @@ import { mkdirSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 
-import { defineTool } from '@deepseek-ai/dsh-tools'
-
 import { TOOL_NAMES, catalogRows, normalizeConfig, shouldInstall } from './catalog.js'
 
 /** Cordis plugin name used by loader diagnostics. */
@@ -106,6 +104,36 @@ function jsonOutput(schema) {
   return {
     schema,
     render: (_args, value) => [{ type: 'text', text: JSON.stringify(value) }],
+  }
+}
+
+/** Compile the compact parameter spec used by the three tool definitions. */
+function toJsonSchema(spec) {
+  const properties = {}
+  const required = []
+  for (const [key, meta] of Object.entries(spec ?? {})) {
+    const property = { type: meta.type }
+    if (meta.description !== undefined) property.description = meta.description
+    if (Array.isArray(meta.enum)) property.enum = meta.enum
+    properties[key] = property
+    if (meta.required === true) required.push(key)
+  }
+  return { type: 'object', properties, required, additionalProperties: false }
+}
+
+/**
+ * Local `defineTool` equivalent: compile the compact parameter spec into a
+ * JSON Schema and register the tool definition unchanged. DSH 0.2.1 no longer
+ * ships `@deepseek-ai/dsh-tools` in the dsh dependency tree, and this package
+ * only needs the plain definition object the registry accepts.
+ */
+function defineTool(options) {
+  return {
+    name: options.name,
+    description: options.description,
+    parameters: toJsonSchema(options.parameters),
+    output: options.output,
+    execute: options.execute,
   }
 }
 
