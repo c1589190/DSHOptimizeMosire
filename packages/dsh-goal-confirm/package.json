@@ -1,6 +1,6 @@
 {
   "name": "@mosire/dsh-goal-confirm",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "type": "module",
   "description": "Ask the Web UI to confirm every automatic goal round: continue, cancel (and delete the goal), or auto-continue after a configurable timeout.",

@@ -1,6 +1,6 @@
 {
   "name": "@mosire/dsh-timing-annotations",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "type": "module",
   "description": "Timing annotations for the DSH Web chat: each finalized assistant message shows its start clock and duration, and every completed turn shows a right-aligned thinking/tool timing line.",

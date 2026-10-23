@@ -1,6 +1,6 @@
 {
   "name": "@mosire/dsh-liangshen-anchored",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "type": "module",
   "description": "Anchored LiangShen preset for DeepSeek Harness Web profiles: Minimal tool pair on the first request, full catalog after the first durable promotion, re-anchor after every compaction.",

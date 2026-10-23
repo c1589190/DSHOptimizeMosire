@@ -1,6 +1,6 @@
 {
   "name": "@mosire/dsh-subagent-access",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "type": "module",
   "description": "Model-facing controls for the sub-agent sessions a session started: list, message, and interrupt its direct children through the official subagent service.",
