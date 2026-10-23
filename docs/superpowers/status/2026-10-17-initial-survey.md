@@ -232,3 +232,25 @@
   - 本地 `defineTool` 现在会把紧凑 output spec 编译成 JSON Schema（0.2.1 无 `@deepseek-ai/dsh-tools` 依赖）。
 - 单测：subagent-access 32/32（新增 idle 返回、阻塞等待、超时、非直接子会话拒绝）；其余包 76/76、30/30。
 - 生效：`@mosire/dshom` 通过相对路径调用该模块；当前 Host 已加载旧模块，**需重启 DSH** 后新会话才有 `subagent_wait`。
+
+## 十六、2026-10-23：peer 改为运行时解析（D-022）
+
+- **现象**：DSH 再次升级（全局安装从 `v11/5a9-…` 换到 `v11/4bb-…`）后，梁神两预设再次全部 `never started`；
+  同时发现 `@mosire/dshom` 已不在 profile 的 `dsh.profile.bundles`（依赖仍在）。
+- **根因（已证）**：`packages/dsh-liangshen-anchored/node_modules/@deepseek-ai/` 的 25 个绝对 symlink 仍指向已删除的
+  `v11/5a9-…/.pnpm/...`；include 以 composition 目录为 baseUrl，裸 `@deepseek-ai/*` 行全部解析失败。
+- **修复（D-022）**：
+  - 新 `lib/host-peers.js`：从 `process.argv[1]` realpath 定位运行中 DSH，回退 `DSH_INSTALL_ANCHOR` / `/proc`；
+    按 DSH 自身的 `packageDirFromAnchor` 方式解析每个 peer，在每次 Host 激活、声明预设前重建 farm；
+  - 找不到 anchor 时不裁剪已有 farm；解析不到的可选包（`dsh-workflow-worker-thread`）不建链，row 按自身可解析性禁用；
+  - `workflow-worker-thread` 的条件从检查 `dsh-workflow-ptc` 改为检查自身；`tool-ralph` 现在能从 `.pnpm/node_modules` 解析并启用；
+  - `tools/doctor.mjs`：检查/修复 profile bundle 条目、farm 链接、上次 preset 状态（`--fix`）；
+  - `@mosire/dshom` 导出 `./package.json`；profile 已重新启用 dshom。
+- **验证**：
+  - 临时 `dsh web --port 3099 --no-open`（pid 3837）加载当前 profile：`peers.synced=true`，anchor 为 `v11/4bb-…` 实目录，
+    `linked=25`，`missing=['@deepseek-ai/dsh-workflow-worker-thread']`；两预设均 `broken:null`。
+  - `dsh plugin --profile web update dsh-plugin` 后 `dsh.profile.bundles` 仍含 `@mosire/dshom`。
+  - 单测：liangshen 83/83（+7 host-peers）、goal-confirm 30/30、subagent-access 32/32。
+  - `node tools/doctor.mjs` → OK；删除一个 farm 链接后 → PROBLEM，`--fix` → FIXED；移除 bundle 条目后 `--fix` 可重新加回。
+- **未验**：3080 现有 Host 仍是旧模块，需用户重启；重启后需验四功能同启（presets/goal-confirm/subagent_wait/timing）与客户端槽位。
+- 决策：`.agents/notes/implemented/2026-10-23-version-agnostic-peer-farm.md`。

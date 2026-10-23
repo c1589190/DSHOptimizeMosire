@@ -23,6 +23,7 @@
 - **本项目目标（六个功能）**：
   - **功能一 · 梁神模式复刻**：以官方机制把锚定式 v7 重建为可安装的 DSH 插件/preset（Web profile bundle），并做**有对照证据**的优化
     （本轮范围：`promoteOn: either` + `context-gate` + Windows 后台任务；双分支/熔断/事实登记簿留待后续）。
+    **版本无关**：预设的官方 peer 在每次 Host 激活时从运行中的 DSH 解析并重建 symlink farm，不持久化 DSH 安装路径（D-022）。
   - **功能二 · goal 续轮确认门**：goal 自动续轮注入时，Web UI 弹显式确认（确认→继续 / 取消→删除 goal / 30s 可配置无操作→继续）。
     调研结论：可用 host 插件在 `agent/pre-step`（prepend）扣住 + 复用官方 `ctx.userQuestions` 卡片 UI，**不改 DSH 源码**。
   - **功能三 · 子 Agent 访问（父 → 子控制面）**：Web profile 顶层会话的 Team 同名工具遮蔽了普通子会话的控制面
@@ -111,9 +112,11 @@
 5. **安全**：不把密钥写进仓库 / 文档；不执行破坏性 git 操作；安装 bundle 会在 Host 进程执行插件代码，只信本仓自产或已审阅的上游包。
 6. **语言**：与用户交流用中文；代码、标识符、提交信息用英文（与上游一致）；文档中文。
 
-## 六、环境事实（本机，2026-10-17）
+## 六、环境事实（本机，2026-10-23）
 
-- DSH 本体：`0.2.0-rc.2`，安装于 `/home/cna/.npm-global/lib/node_modules/@deepseek-ai/dsh/`（**只读参考，不改**）。
+- DSH 本体：`0.2.1-rc.2`，pnpm global 安装；当前入口
+  `/home/cna/.local/share/pnpm/global/v11/499c6f07…/node_modules/@deepseek-ai/dsh/lib/bin.js`（该路径是符号链接，内容寻址实目录为 `v11/4bb-18e127…`）。
+  **安装目录随升级变化**，任何插件都不得持久化其绝对路径；官方 peer 由 `packages/dsh-liangshen-anchored/lib/host-peers.js` 在运行时解析。
 - 当前 profile：`web`；GUI：http://127.0.0.1:3080。
 - 本机 legacy 快照：`~/.dsh/.agent-presets/liangshen/`（9 文件 / 1451 行；**已不被任何会话读取**，只作移植素材）。
 - 上游仍在维护的同源实现：`@deepseek-harness-tui/dsh-tui@0.15.0` → `presets/liangshen/`（registry 声明）；
@@ -154,6 +157,11 @@ profile 只启用 dshom；`config.features` 可逐项关闭；旧包只作 works
 超时返回 `status:"timeout"`），随后从 live session / sessionQuery 读取该子会话事件，返回最后一条非空 assistant 消息；
 父会话中断信号会中止等待。
 
+**版本无关的 peer 解析（2026-10-23）**：D-022=预设的 `@deepseek-ai/*` 行不再依赖持久化的绝对 symlink：
+每次 Host 激活时由 `lib/host-peers.js` 从 `process.argv[1]` realpath（回退 `/proc` 运行中 Host）解析 peer 并重建 farm；
+可选行（`workflow-worker-thread` / `tool-ralph`）按自身包是否可解析决定禁用。配套 `tools/doctor.mjs` 检查/修复 profile bundle 条目、
+farm 链接与上次 preset 状态；`@mosire/dshom` 导出 `./package.json`。证据见 `.agents/notes/implemented/2026-10-23-version-agnostic-peer-farm.md`。
+
 **当前门禁（必须遵守）**：
 1. 功能一/二 spec 与计划已获用户批准并已提交；功能三/四 设计已定（用户 2026-10-17「出设计，提交并推送，然后开始实现」授权直接实现）。
 2. 进度（2026-10-17 深夜）：功能一 **M0/T1/T2/T3/T4/T5 完成**（未验：Windows 实机、子代理锚定 E1、resume F1）；
@@ -169,6 +177,11 @@ profile 只启用 dshom；`config.features` 可逐项关闭；旧包只作 works
    2026-10-19：DSH 升级 0.2.1-rc.2 后修复 peer relink（`9daa47e`），并将六个功能统一安装为 `@mosire/dshom`（D-020）；
    两预设 `broken:null`、goal-confirm/subagent-access 均 activated；待用户新会话验收四功能同启。
    2026-10-19：`subagent-access` 新增 `subagent_wait`（D-021）；单测 32/32；等待 DSH 重启后对新会话生效。
+   2026-10-23：DSH 再次升级后 farm 的 25 个链接全部指向已删除的 `v11/5a9-…`，预设声明列出 24 个 `never started`；改为运行时解析（D-022）。
+   临时 `dsh web --port 3099` 验证两预设 `broken:null`（`peers.synced=true`、`linked=25`、仅 `workflow-worker-thread` 缺失并自动禁用）；
+   单测 liangshen 83/83、goal-confirm 30/30、subagent-access 32/32；`tools/doctor.mjs` 可修 farm/bundle 条目。
+   当前 profile 已重新启用 `@mosire/dshom`（此前从 `dsh.profile.bundles` 消失，具体删除路径未复现）；
+   **待用户重启 3080 Host** 以加载新 Host 代码（`subagent_wait` + 运行时 farm），再验四功能同启与客户端时间标注。
    功能五（2026-10-17）：**已实现并实机通过**（`instruction-hint` epoch 感知 recovery + `context-gate.allowKinds`；单测 liangshen 76/76）；用户重启后会话 `session-aa65c681…`：压缩@104 → recovery-hint@111 → 首请求 tools=2 → 模型重读 AGENTS.md@116，verifier exit=0。证据本机 `.superpowers/sdd/2026-10-17-compaction-recovery-hint/`；空预设未单独跑 recovery。
 3. 任何新增「待裁定」先做口径溯源并落盘，已有裁定不重复问（见 `docs/AGENTS.md` §二）。
 4. 用户 2026-10-17 已授权本阶段 `git commit` + push 到 `git@github.com:c1589190/DSHOptimizeMosire.git`（main）。

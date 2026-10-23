@@ -27,6 +27,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
+import { syncPackagePeerFarm } from './host-peers.js'
 
 /** Stable cordis plugin name (loader diagnostics). */
 export const name = 'liangshen-anchored'
@@ -131,11 +132,44 @@ async function declareOne(ctx, registry, spec) {
   }
 }
 
-/** Declare every bundled preset; one failure must not block the other. */
-export async function declarePresets(ctx) {
+/**
+ * Refresh the preset's peer links from the running DSH installation.
+ *
+ * Exposed as an option so tests can stub filesystem work; the default resolves
+ * the install from `process.argv[1]` and rewrites the farm in this package.
+ * @returns {Promise<object>} a diagnostic record for the status file
+ */
+async function defaultSyncPeers() {
+  try {
+    return syncPackagePeerFarm()
+  } catch (error) {
+    return { synced: false, error: String(error?.message ?? error), linked: [], missing: [], changed: [] }
+  }
+}
+
+/**
+ * Declare every bundled preset; one failure must not block the other.
+ * @param {object} ctx Host context providing `agentPresets`
+ * @param {{syncPeers?: () => Promise<object>}} [options]
+ */
+export async function declarePresets(ctx, options = {}) {
+  const syncPeers = options.syncPeers ?? defaultSyncPeers
+  let peers
+  try {
+    peers = await syncPeers()
+  } catch (error) {
+    peers = { synced: false, error: String(error?.message ?? error) }
+  }
+  peers = peers ?? { synced: false, error: 'peer sync returned no result' }
+  if (peers.synced === false) {
+    ctx.logger?.warn?.('liangshen-anchored: peer links were not refreshed: %s', peers.error ?? 'unknown error')
+  } else if (Array.isArray(peers.missing) && peers.missing.length > 0) {
+    ctx.logger?.warn?.('liangshen-anchored: peers missing from the running DSH install: %s', peers.missing.join(', '))
+  }
+
   const registry = ctx.get('agentPresets')
   if (registry === undefined || typeof registry.register !== 'function') {
-    await writeStatus({ declared: false, error: 'agentPresets service unavailable', presets: [] })
+    await writeStatus({ declared: false, error: 'agentPresets service unavailable', presets: [], peers })
     return
   }
   const presets = []
@@ -143,6 +177,7 @@ export async function declarePresets(ctx) {
   const base = presets.find((preset) => preset.id === 'liangshen')
   await writeStatus({
     declared: presets.every((preset) => preset.declared),
+    peers,
     presets,
     // Backward-compatible single-preset projection: the diagnostics file is
     // read by hand and by older notes, so keep the original keys meaningful.

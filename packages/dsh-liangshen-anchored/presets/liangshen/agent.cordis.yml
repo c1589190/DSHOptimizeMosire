@@ -444,7 +444,7 @@
       disabled: !!js >-
         (() => {
           const require = process.getBuiltinModule('node:module').createRequire(ctx.baseUrl)
-          try { require.resolve('@deepseek-ai/dsh-workflow-ptc/package.json'); return true } catch { return false }
+          try { require.resolve('@deepseek-ai/dsh-workflow-worker-thread'); return false } catch { return true }
         })()
       config:
         provider: spawn
@@ -454,7 +454,7 @@
       disabled: !!js >-
         (() => {
           const require = process.getBuiltinModule('node:module').createRequire(ctx.baseUrl)
-          try { require.resolve('@deepseek-ai/dsh-workflow-ptc/package.json'); return false } catch { return true }
+          try { require.resolve('@deepseek-ai/dsh-workflow-ptc'); return false } catch { return true }
         })()
       config:
         provider: spawn
@@ -462,18 +462,15 @@
     - id: tool-workflow
       name: '@deepseek-ai/dsh-tool-workflow'
 
-    # DSH 0.2.1 split ralph out of the dsh package into the optional
-    # `@deepseek-ai/dsh-experimental-ralph-bundle`, so the bare row is no longer
-    # resolvable from a preset shipped with the default install. Keep the row
-    # only when the package actually resolves (0.2.0 installs and profiles that
-    # opted into the experimental bundle); otherwise skip it instead of failing
-    # the whole preset mount with "never started".
+    # DSH 0.2.1 split ralph out of the dsh package. The runtime peer farm
+    # resolves it when the running install actually ships it; otherwise the row
+    # is skipped instead of failing the whole preset mount with "never started".
     - id: tool-ralph
       name: '@deepseek-ai/dsh-tool-ralph'
       disabled: !!js >-
         (() => {
           const require = process.getBuiltinModule('node:module').createRequire(ctx.baseUrl)
-          try { require.resolve('@deepseek-ai/dsh-tool-ralph/package.json'); return false } catch { return true }
+          try { require.resolve('@deepseek-ai/dsh-tool-ralph'); return false } catch { return true }
         })()
       config:
         subagentProvider: spawn

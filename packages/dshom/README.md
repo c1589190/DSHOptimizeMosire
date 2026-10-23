@@ -12,6 +12,10 @@ DSH Optimize Mosire 的**唯一入口 bundle**：把此前分开安装/启用的
 Host 入口按需调用各功能的既有 `apply`，不复制业务代码；预设组合仍位于
 `packages/dsh-liangshen-anchored/presets/liangshen/`（由该包自己的 peer symlink 农场解析 `@deepseek-ai/*`）。
 
+**版本无关**：peer 农场在每次 Host 激活时从运行中的 DSH 安装重建（`process.argv[1]` realpath，回退 `/proc`），
+不持久化 pnpm 版本目录；DSH 升级后不需要手动重链。装好后跑 `node tools/doctor.mjs` 可检查
+`dsh.profile.bundles` 条目、farm 链接与上次 preset 状态；`--fix` 会重新加回 bundle 条目并刷新 farm。
+
 ## 配置
 
 ```yaml

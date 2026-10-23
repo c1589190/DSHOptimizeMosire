@@ -31,13 +31,18 @@ function makeCtx(registry) {
   }
 }
 
+/** Fake peer sync so the suite never rewrites the workspace farm. */
+async function fakeSyncPeers() {
+  return { synced: true, anchor: '/fake/dsh/lib/bin.js', linked: ['@deepseek-ai/dsh-persona'], missing: [], changed: [] }
+}
+
 /** Run declarePresets with DSH_HOME isolated to a temp dir; return the status file. */
 async function declare(registry) {
   const home = mkdtempSync(join(tmpdir(), 'dshom-presets-'))
   const previous = process.env.DSH_HOME
   process.env.DSH_HOME = home
   try {
-    await declarePresets(makeCtx(registry))
+    await declarePresets(makeCtx(registry), { syncPeers: fakeSyncPeers })
     return JSON.parse(readFileSync(join(home, 'liangshen-anchored-status.json'), 'utf8'))
   } finally {
     if (previous === undefined) delete process.env.DSH_HOME
@@ -69,6 +74,8 @@ test('declares both bundled presets with metadata and absolute composition URLs'
   assert.equal(status.declared, true)
   assert.equal(status.presets.length, 2)
   assert.deepEqual(status.presets.map((preset) => preset.broken), [null, null])
+  assert.equal(status.peers.synced, true)
+  assert.equal(status.peers.anchor, '/fake/dsh/lib/bin.js')
   // Backward-compatible single-preset projection.
   assert.equal(status.presetId, 'liangshen')
   assert.equal(status.broken, null)

@@ -24,6 +24,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync,
 import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { findHostAnchor, resolveHostPeer } from '../packages/dsh-liangshen-anchored/lib/host-peers.js'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const repoRoot = dirname(here)
@@ -45,13 +46,15 @@ function importSpecifiers(source) {
 
 /** Every official package named by one composition file. */
 function compositionNames(source) {
-  return [...source.matchAll(/^\s*name:\s*['"]?(@deepseek-ai\/[^'"\s#]+)['"]?/gm)].map((match) => match[1])
+  return [...source.matchAll(/^\s*(?:-\s+)?name:\s*['"]?(@deepseek-ai\/[^'"\s#]+)['"]?/gm)].map((match) => match[1])
 }
 
 /** Add the scoped package root of one specifier to a name set. */
 function addPackageName(names, specifier) {
   if (!specifier.startsWith('@deepseek-ai/')) return
-  names.add(specifier.split('/').slice(0, 2).join('/'))
+  const parts = specifier.split('/')
+  if (parts.length < 2 || !/^[a-z0-9][a-z0-9._-]*$/i.test(parts[1])) return
+  names.add(`${parts[0]}/${parts[1]}`)
 }
 
 /** Recursively collect files below a directory that match one suffix. */
@@ -186,6 +189,16 @@ if (sourceRoot === undefined) {
   console.error(`link-dsh-peers: no @deepseek-ai peer packages found for ${dshRoot}; pass --dsh-root <.../@deepseek-ai/dsh>`)
   process.exit(1)
 }
+let hostAnchor
+try {
+  hostAnchor = findHostAnchor([join(realpathSync(dshRoot), 'lib', 'bin.js')])?.anchor
+} catch {
+  hostAnchor = undefined
+}
+if (hostAnchor === undefined) {
+  console.error(`link-dsh-peers: cannot resolve official peers from ${dshRoot}; pass --dsh-root <.../@deepseek-ai/dsh>`)
+  process.exit(1)
+}
 
 const packageNames = readdirSync(packagesRoot, { withFileTypes: true })
   .filter((entry) => entry.isDirectory() && existsSync(join(packagesRoot, entry.name, 'package.json')))
@@ -204,14 +217,14 @@ for (const packageName of packageNames) {
     mkdirSync(targetRoot, { recursive: true })
     for (const name of names) {
       const shortName = name.split('/')[1]
-      const source = join(sourceRoot, shortName)
-      const target = join(targetRoot, shortName)
-      if (!existsSync(source)) {
+      const peer = resolveHostPeer(hostAnchor, name)
+      if (peer === undefined) {
         missing.push(name)
         continue
       }
+      const target = join(targetRoot, shortName)
       rmSync(target, { recursive: true, force: true })
-      symlinkSync(source, target, 'dir')
+      symlinkSync(peer.dir, target, 'dir')
       linked += 1
     }
   }
