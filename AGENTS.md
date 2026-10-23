@@ -20,7 +20,7 @@
   本机残留的 `~/.dsh/.agent-presets/liangshen/` 因此不再被任何会话读取；dsh-web 插件版后来又在 v0.3.23 重构为「极简 persona + PTC/both」，锚定被退役。
 - **一手复刻材料**：本机 legacy 目录里的 v7 源码（9 文件 / 1451 行）+ TUI 0.15.0 包内同源副本
   （`@deepseek-harness-tui/dsh-tui/presets/liangshen/`）。现代承载形态必须改成 **bundle patch + `@deepseek-ai/dsh-agent-preset` 声明**。
-- **本项目目标（六个功能）**：
+- **本项目目标（七个功能）**：
   - **功能一 · 梁神模式复刻**：以官方机制把锚定式 v7 重建为可安装的 DSH 插件/preset（Web profile bundle），并做**有对照证据**的优化
     （本轮范围：`promoteOn: either` + `context-gate` + Windows 后台任务；双分支/熔断/事实登记簿留待后续）。
     **版本无关**：预设的官方 peer 在每次 Host 激活时从运行中的 DSH 解析并重建 symlink farm，不持久化 DSH 安装路径（D-022）。
@@ -36,7 +36,10 @@
   - **功能六 · Chat 时间标注（Web UI 插件）**：只用 Chat 官方 additive slots
     （`conversation.chat.assistant-actions` + `conversation.chat.turnTail`）显示每条 assistant 消息的开始时间/耗时，
     以及每轮思考/工具命令的开始时间与耗时；运行中由 LiveTiming overlay 实时显示。不替换渲染器、不写宿主 DOM。裁定见 D-017/D-018/D-019。
-- **交付形态（2026-10-19，D-020）**：以上六个功能统一由**单一 bundle `@mosire/dshom`** 提供（Host 入口按特性调用各实现模块；
+  - **功能七 · 后台任务等待与输出优化**：`job_wait` 阻塞到 job 结束、只返回状态；`job_read` 在绝对偏移读取输出并做
+    确定性字符优化（ANSI/CR 清理、重复行合并、head/tail/errors/summary），不消费 `job_output` 游标。创建仍由
+    `bash run_in_background` 等生产者负责；首轮锚定不变。裁定见 D-023。
+- **交付形态（2026-10-19，D-020）**：以上七个功能统一由**单一 bundle `@mosire/dshom`** 提供（Host 入口按特性调用各实现模块；
   Client half = 聊天时间标注）；旧 `@mosire/dsh-*` 包保留为实现/测试模块，profile 只启用 `dshom`。
 - 权威顺序：**用户原话 > 最新落盘文档 > 本文件 > `docs/agents/*.md` 长文 > 上游参考（DSH / TUI / dsh-web 的源码与 README）> 旧文档**。
 - 「当前状态」不抄在本文件：看 `docs/superpowers/status/` 最新一份 + `git log --oneline`。
@@ -150,7 +153,7 @@ D-008=生成器（`tools/sync-preset-variant.mjs`）+ 提交产物、单测防�
 不替换 Chat 渲染器、不写 DOM；D-018=保留 DSH 自带 Trajectory 视图作为现成能力，不二次开发；
 D-019=运行中实时计时用 LiveTiming overlay（composer.dock；只读行 DOM 对齐，不改宿主 DOM）。
 
-**统一交付（2026-10-19）**：D-020=六个功能收进单一 bundle `@mosire/dshom`（Host 入口组合各实现模块 + Client half 时间标注），
+**统一交付（2026-10-19）**：D-020=原六个功能收进单一 bundle `@mosire/dshom`（Host 入口组合各实现模块 + Client half 时间标注；2026-10-23 D-023 增加第七个），
 profile 只启用 dshom；`config.features` 可逐项关闭；旧包只作 workspace 内部实现/测试。
 
 **子 Agent 等待工具（2026-10-19）**：D-021=新增 `subagent_wait`：校验直接子会话后 `await child.whenIdle()`（可选 `timeout_seconds`，
@@ -161,6 +164,11 @@ profile 只启用 dshom；`config.features` 可逐项关闭；旧包只作 works
 每次 Host 激活时由 `lib/host-peers.js` 从 `process.argv[1]` realpath（回退 `/proc` 运行中 Host）解析 peer 并重建 farm；
 可选行（`workflow-worker-thread` / `tool-ralph`）按自身包是否可解析决定禁用。配套 `tools/doctor.mjs` 检查/修复 profile bundle 条目、
 farm 链接与上次 preset 状态；`@mosire/dshom` 导出 `./package.json`。证据见 `.agents/notes/implemented/2026-10-23-version-agnostic-peer-farm.md`。
+
+**后台任务工具（2026-10-23）**：D-023=新增 Agent 级 `job_wait` / `job_read`（`@mosire/dsh-job-tools`）。
+`job_wait` 只阻塞并返回状态（默认 600s、上限 3600s，超时不杀 job）；`job_read` 用 `ctx.jobs.readAt` 非消费读取，
+做 ANSI/CR/控制字符清理、相邻重复行合并、head/tail/errors/summary/auto/raw 模式与 head+tail 字节上限；
+创建仍由 `bash run_in_background` 负责。证据见 `.agents/notes/implemented/2026-10-23-job-wait-read-tools.md`。
 
 **当前门禁（必须遵守）**：
 1. 功能一/二 spec 与计划已获用户批准并已提交；功能三/四 设计已定（用户 2026-10-17「出设计，提交并推送，然后开始实现」授权直接实现）。
@@ -182,6 +190,9 @@ farm 链接与上次 preset 状态；`@mosire/dshom` 导出 `./package.json`。�
    单测 liangshen 83/83、goal-confirm 30/30、subagent-access 32/32；`tools/doctor.mjs` 可修 farm/bundle 条目。
    当前 profile 已重新启用 `@mosire/dshom`（此前从 `dsh.profile.bundles` 消失，具体删除路径未复现）；
    **待用户重启 3080 Host** 以加载新 Host 代码（`subagent_wait` + 运行时 farm），再验四功能同启与客户端时间标注。
+   2026-10-23（D-023）：新增 `job_wait` / `job_read` 与字符优化器；单测 18/18（optimizer 9 + tools 9）；
+   临时 3099 Host 与 headless Agent 均成功安装两工具（`job-tools-status.json` installed 含真实 session id）；
+   真实 `ctx.jobs` 的 job_wait 阻塞/读取 E2E 需重启 3080 后跑。
    功能五（2026-10-17）：**已实现并实机通过**（`instruction-hint` epoch 感知 recovery + `context-gate.allowKinds`；单测 liangshen 76/76）；用户重启后会话 `session-aa65c681…`：压缩@104 → recovery-hint@111 → 首请求 tools=2 → 模型重读 AGENTS.md@116，verifier exit=0。证据本机 `.superpowers/sdd/2026-10-17-compaction-recovery-hint/`；空预设未单独跑 recovery。
 3. 任何新增「待裁定」先做口径溯源并落盘，已有裁定不重复问（见 `docs/AGENTS.md` §二）。
 4. 用户 2026-10-17 已授权本阶段 `git commit` + push 到 `git@github.com:c1589190/DSHOptimizeMosire.git`（main）。

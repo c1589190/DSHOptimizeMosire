@@ -254,3 +254,22 @@
   - `node tools/doctor.mjs` → OK；删除一个 farm 链接后 → PROBLEM，`--fix` → FIXED；移除 bundle 条目后 `--fix` 可重新加回。
 - **未验**：3080 现有 Host 仍是旧模块，需用户重启；重启后需验四功能同启（presets/goal-confirm/subagent_wait/timing）与客户端槽位。
 - 决策：`.agents/notes/implemented/2026-10-23-version-agnostic-peer-farm.md`。
+
+## 十七、2026-10-23：后台任务 `job_wait` / `job_read`（D-023）
+
+- **用户要求**：把创建 job、等待结束、读取输出分开；读取时做字符优化，避免 agent 频繁 `sleep`。
+- **实现**（`packages/dsh-job-tools`，版本 0.1.1）：
+  - `job_wait(job_id, timeout_seconds?)`：`ctx.jobs.wait` 阻塞；只返回状态，不返回输出、不杀 job；默认 600s、上限 3600s；
+  - `job_read(job_id, mode?, lines?, max_bytes?, from_offset?)`：`ctx.jobs.readAt` 非消费读取；
+    ANSI/控制字符清理、`\r` 进度折叠、相邻重复行合并、空行/尾空格压缩、`auto/full/head/tail/errors/summary/raw` 模式、
+    head+tail 字节上限与 omitted 标记；final-output job 回退 `read` 取 result；
+  - 每个 live Agent scope 注册，跟随 `agent/created`/`agent/disposed`；`@mosire/dshom` 加 `features.jobTools` / `jobTools` 配置；
+  - 创建仍走 `bash run_in_background`（不新增 `job_start`），首轮锚定不变。
+- **单测**：`dsh-job-tools` 18/18（optimizer 9 + tools 9）；其余 83/83、30/30、32/32。
+- **实机注册**：
+  - 临时 `dsh web --port 3099 --no-open`：`job-tools-status.json` `activated:true`、`tools:["job_wait","job_read"]`；预设仍 `broken:null`。
+  - `dsh --profile headless --patch /tmp/dshom-verify.patch.yml "<task>"`：创建真实 Agent 后 status `installed:["session-a63f3436-…"]`；
+    该次因未配置 `DEEPSEEK_API_KEY` 没发起模型请求。
+- **未验**：真实 `ctx.jobs` 的 `job_wait` 阻塞/`job_read` 输出；需重启 3080 后在真实会话跑
+  `sleep 5; echo JOB-OK` + `job_wait` + `job_read`。
+- 决策：`.agents/notes/implemented/2026-10-23-job-wait-read-tools.md`。
