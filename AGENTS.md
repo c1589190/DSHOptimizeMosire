@@ -192,7 +192,8 @@ farm 链接与上次 preset 状态；`@mosire/dshom` 导出 `./package.json`。�
    **待用户重启 3080 Host** 以加载新 Host 代码（`subagent_wait` + 运行时 farm），再验四功能同启与客户端时间标注。
    2026-10-23（D-023）：新增 `job_wait` / `job_read` 与字符优化器；单测 18/18（optimizer 9 + tools 9）；
    临时 3099 Host 与 headless Agent 均成功安装两工具（`job-tools-status.json` installed 含真实 session id）；
-   真实 `ctx.jobs` 的 job_wait 阻塞/读取 E2E 需重启 3080 后跑。
+   用户隔离 headless 真实 E2E 通过：`bash-7f92880f64174bf6` → `job_wait` 3044ms completed → `job_read(summary)` = `tick1..3 / JOB-OK`，无 sleep；
+   证据 `.superpowers/sdd/2026-10-23-job-tools/evidence/e2e-live.jsonl`；当前 3080 Host 仍是旧进程，重启后可在本会话复验。
    功能五（2026-10-17）：**已实现并实机通过**（`instruction-hint` epoch 感知 recovery + `context-gate.allowKinds`；单测 liangshen 76/76）；用户重启后会话 `session-aa65c681…`：压缩@104 → recovery-hint@111 → 首请求 tools=2 → 模型重读 AGENTS.md@116，verifier exit=0。证据本机 `.superpowers/sdd/2026-10-17-compaction-recovery-hint/`；空预设未单独跑 recovery。
 3. 任何新增「待裁定」先做口径溯源并落盘，已有裁定不重复问（见 `docs/AGENTS.md` §二）。
 4. 用户 2026-10-17 已授权本阶段 `git commit` + push 到 `git@github.com:c1589190/DSHOptimizeMosire.git`（main）。

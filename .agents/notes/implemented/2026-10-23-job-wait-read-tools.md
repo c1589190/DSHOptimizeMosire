@@ -41,9 +41,14 @@ job id。官方 `job_output` 支持 `wait: true`，但：
 - 临时 `dsh web --port 3099 --no-open` 加载 dshom：`$DSH_HOME/job-tools-status.json`
   `activated: true, tools: ["job_wait","job_read"]`；两预设 `broken:null`。
 - 真实 Agent 注册：`dsh --profile headless --patch /tmp/dshom-verify.patch.yml "<task>"` 创建 Agent 后，
-  status 文件 `installed: ["session-a63f3436-…"]`；该次 headless 因未配置 `DEEPSEEK_API_KEY` 未发起模型请求，
-  所以**没有**真实模型调用 job_wait/job_read 的证据。
-- **未验**：真实 `ctx.jobs` 的 `job_wait` 阻塞时长与 `job_read` 输出（需重启 3080 Host 后在真实会话跑）。
+  status 文件 `installed: ["session-a63f3436-…"]`；该次 headless 因未配置 `DEEPSEEK_API_KEY` 未发起模型请求。
+- **真实 E2E（2026-10-23，用户提供）**：隔离 headless Agent，`DSH_PERMISSION_MODE=danger-full-access`，
+  会话 `session-9e941c5c-6eac-4690-9f1e-7c97f46fe5b2`：
+  - `bash run_in_background` → `bash-7f92880f64174bf6`；
+  - `job_wait` → `status:"completed"`、`detail:"exit code: 0"`、`timedOut:false`、`elapsedMs:3044`；
+  - `job_read(mode:"summary")` → `tick1\ntick2\ntick3\nJOB-OK`，`outputLines:4`、`outputBytes:24`、`lossy:false`、`nextOffset:25`；
+  - 全程无 `sleep`/轮询。证据：本机 `.superpowers/sdd/2026-10-23-job-tools/evidence/e2e-live.jsonl`（不进 git）。
+- **当前 3080 Host 仍是旧进程**：需重启后本会话工具面才会出现 `job_wait`/`job_read`；功能代码本身已通过上述真实 E2E。
 
 ## 边界
 

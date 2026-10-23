@@ -270,6 +270,11 @@
   - 临时 `dsh web --port 3099 --no-open`：`job-tools-status.json` `activated:true`、`tools:["job_wait","job_read"]`；预设仍 `broken:null`。
   - `dsh --profile headless --patch /tmp/dshom-verify.patch.yml "<task>"`：创建真实 Agent 后 status `installed:["session-a63f3436-…"]`；
     该次因未配置 `DEEPSEEK_API_KEY` 没发起模型请求。
-- **未验**：真实 `ctx.jobs` 的 `job_wait` 阻塞/`job_read` 输出；需重启 3080 后在真实会话跑
-  `sleep 5; echo JOB-OK` + `job_wait` + `job_read`。
+- **真实 E2E（2026-10-23，用户提供）**：隔离 headless Agent（当前 3080 Host 未重启），
+  `DSH_PERMISSION_MODE=danger-full-access`，会话 `session-9e941c5c-6eac-4690-9f1e-7c97f46fe5b2`：
+  - `bash run_in_background` → `bash-7f92880f64174bf6`；
+  - `job_wait` → `status:"completed"`、`detail:"exit code: 0"`、`timedOut:false`、`elapsedMs:3044`；
+  - `job_read(mode:"summary")` → `tick1\ntick2\ntick3\nJOB-OK`，`outputLines:4`、`outputBytes:24`、`lossy:false`、`nextOffset:25`；
+  - 无 `sleep`/轮询。证据：本机 `.superpowers/sdd/2026-10-23-job-tools/evidence/e2e-live.jsonl`（不进 git）。
+- **待办**：当前 3080 Host 仍是旧进程，需重启后在本会话直接复验工具面；功能代码已通过隔离 Agent 的真实 E2E。
 - 决策：`.agents/notes/implemented/2026-10-23-job-wait-read-tools.md`。
