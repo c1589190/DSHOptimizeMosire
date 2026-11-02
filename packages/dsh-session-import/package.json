@@ -1,0 +1,23 @@
+{
+  "name": "@mosire/dsh-session-import",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Import DSH session logs (ZIP / JSONL / multi-frame zstd) back into the session persistence service through the official write API.",
+  "exports": {
+    ".": "./lib/index.js",
+    "./package.json": "./package.json"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/dsh": ">=0.2.0-rc.2"
+  },
+  "dsh": {
+    "engines": {
+      "dsh": ">=0.2.0-rc.2"
+    }
+  },
+  "files": [
+    "lib/",
+    "README.md"
+  ]
+}

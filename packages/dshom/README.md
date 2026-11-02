@@ -1,6 +1,6 @@
 # @mosire/dshom
 
-DSH Optimize Mosire 的**唯一入口 bundle**：把梁神预设、goal 确认、子 Agent 控制、后台任务工具和聊天时间标注收进一个插件行。
+DSH Optimize Mosire 的**唯一入口 bundle**：把梁神预设、goal 确认、子 Agent 控制、后台任务工具和聊天时间标注、Session 导入收进一个插件行。
 
 | 功能 | 实现 | 默认 |
 |---|---|---|
@@ -9,6 +9,7 @@ DSH Optimize Mosire 的**唯一入口 bundle**：把梁神预设、goal 确认�
 | 父→子 Agent 控制工具（`subagent_list/message/interrupt/wait`） | `../dsh-subagent-access/lib/index.js` | 开 |
 | 后台任务 `job_wait` / `job_read`（等待与优化输出分离） | `../dsh-job-tools/lib/index.js` | 开 |
 | 聊天时间标注（运行中实时 + 完成后） | `./client.js` | 开 |
+| Session 日志导入（`/import <路径>`） | `../dsh-session-import/lib/index.js` | 开 |
 
 Host 入口按需调用各功能的既有 `apply`，不复制业务代码；预设组合仍位于
 `packages/dsh-liangshen-anchored/presets/liangshen/`（由该包自己的 peer symlink 农场解析 `@deepseek-ai/*`）。
@@ -28,6 +29,7 @@ Host 入口按需调用各功能的既有 `apply`，不复制业务代码；预�
       goalConfirm: true    # goal 续轮确认门
       subagentAccess: true # 父→子控制工具
       jobTools: true       # job_wait / job_read
+      sessionImport: true  # /import <zip|jsonl|zstd>
     goalConfirm:
       timeoutSeconds: 30
       cancelOnClose: true
@@ -37,6 +39,8 @@ Host 入口按需调用各功能的既有 `apply`，不复制业务代码；预�
       defaultTimeoutSeconds: 600
       maxTimeoutSeconds: 3600
       maxBytes: 16384
+    sessionImport:
+      maxBytes: 1073741824
       defaultLines: 200
 ```
 

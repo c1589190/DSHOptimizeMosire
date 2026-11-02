@@ -11,6 +11,7 @@ import { apply as applyLiangshen } from '../dsh-liangshen-anchored/lib/index.js'
 import { apply as applyGoalConfirm } from '../dsh-goal-confirm/lib/index.js'
 import { apply as applySubagentAccess } from '../dsh-subagent-access/lib/index.js'
 import { apply as applyJobTools } from '../dsh-job-tools/lib/index.js'
+import { apply as applySessionImport } from '../dsh-session-import/lib/index.js'
 
 /** Cordis plugin name used by loader diagnostics. */
 export const name = 'dshom'
@@ -52,5 +53,9 @@ export function apply(ctx, config = {}) {
   if (features.jobTools !== false) {
     const jobConfig = source.jobTools ?? {}
     whenReady(ctx, ['agents', 'jobs'], (ready) => applyJobTools(ready, jobConfig))
+  }
+  if (features.sessionImport !== false) {
+    const importConfig = source.sessionImport ?? {}
+    whenReady(ctx, ['sessionPersistence'], (ready) => applySessionImport(ready, importConfig))
   }
 }
