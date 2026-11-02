@@ -26,6 +26,8 @@
     **版本无关**：预设的官方 peer 在每次 Host 激活时从运行中的 DSH 解析并重建 symlink farm，不持久化 DSH 安装路径（D-022）。
   - **功能二 · goal 续轮确认门**：goal 自动续轮注入时，Web UI 弹显式确认（确认→继续 / 取消→删除 goal / 30s 可配置无操作→继续）。
     调研结论：可用 host 插件在 `agent/pre-step`（prepend）扣住 + 复用官方 `ctx.userQuestions` 卡片 UI，**不改 DSH 源码**。
+    **会话级开关（2026-10-24，D-024）**：`/goal-confirm on|off|wait|timeout|reset` + 卡片第三项「本会话不再确认」+
+    composer dock 小开关；状态由会话日志 `command/run` 经 projection `goal-confirm` 重建（`timeoutSeconds: 0` = 等待人工）。
   - **功能三 · 子 Agent 访问（父 → 子控制面）**：Web profile 顶层会话的 Team 同名工具遮蔽了普通子会话的控制面
     （E2E 证据见 `docs/agents/03-…`）。host 插件补 `subagent_list` / `subagent_message` / `subagent_interrupt` /
     `subagent_wait` 四个工具（wait 阻塞到子 Agent 停下并返回最后一条 assistant 消息），只调官方
@@ -101,12 +103,14 @@
 - `docs/superpowers/specs/2026-10-17-empty-system-prompt-design.md` —— 功能四：空系统提示词预设（生成器+产物、多预设注册、verifier 扩展）。
 - `docs/superpowers/specs/2026-10-17-compaction-recovery-hint-design.md` —— 功能五：压缩后恢复 hint（epoch 感知注入/gate allowKinds/验收判据）。
 - `docs/superpowers/specs/2026-10-17-chat-timing-annotations-design.md` —— 功能六：Chat 时间标注（官方槽位方案 A/数据来源/已知限制）。
+- `docs/superpowers/specs/2026-10-24-goal-confirm-session-switch-design.md` —— 功能二扩展：会话级开关（命令/卡片第三项/composer dock 开关、projection `goal-confirm`、fail-open）。
 - `docs/superpowers/specs/2026-11-02-session-import-design.md` —— 功能八：Session 导入（输入嗅探/id 策略/cwd/附件/失败语义）。
 - `docs/superpowers/plans/2026-10-17-liangshen-anchored.md`、`…-goal-confirm-gate.md`、`…-subagent-access.md`、`…-empty-system-prompt.md`、`…-compaction-recovery-hint.md`、`…-session-import.md` —— 逐任务实现计划。
 
 **④ 状态与交接**
 
 - `docs/superpowers/status/2026-10-17-initial-survey.md` —— 本轮调研与实现进度（**下次开工先读它**）。
+- `docs/superpowers/status/2026-10-24-goal-confirm-session-switch.md` —— D-024 会话级开关：改了什么、验证到哪层、重启后的 E2E 清单。
 - `docs/superpowers/status/2026-11-02-session-import.md` —— 功能八：实现、真实后端 E2E 与未验证清单（**最新状态**）。
 
 ## 五、交叉纪律要点（每条只是概述 + 指针）
@@ -175,6 +179,13 @@ farm 链接与上次 preset 状态；`@mosire/dshom` 导出 `./package.json`。�
 做 ANSI/CR/控制字符清理、相邻重复行合并、head/tail/errors/summary/auto/raw 模式与 head+tail 字节上限；
 创建仍由 `bash run_in_background` 负责。证据见 `.agents/notes/implemented/2026-10-23-job-wait-read-tools.md`。
 
+**goal 确认门会话级开关（2026-10-24）**：D-024（用户「开始吧，选 C」）=会话级覆盖 + Web UI 小开关。
+`/goal-confirm on|off|wait|timeout <0..3600>|reset` 为唯一写路径（官方 commands 追加 `command/run`），
+Host 注册 `sessionProjections` 单元 `goal-confirm`（`stateVersion:1`）折叠并从日志重建，`wire.view` 给客户端；
+卡片第三项与 composer dock 开关都走同一命令；`wait`（0 秒）弹卡前用 `typertGateway.hasLiveClient()` 兜底；
+全局 `enabled:false` 仍是硬关。设计见 `docs/superpowers/specs/2026-10-24-goal-confirm-session-switch-design.md`，
+证据见 `.agents/notes/implemented/2026-10-24-goal-confirm-session-switch.md`。
+
 **Session 日志导入（2026-11-02）**：D-025（用户 2026-11-02 选「B」）=新包 `@mosire/dsh-session-import` + `/import <路径>`，
 Host 直接读盘；只走官方 `sessionPersistence.create/append/flush/close`，不拼物理日志格式；只收 v4、拒绝 `isSeeded:true`、
 整批校验后才写；cwd 保留原值（不存在回退 Agent cwd）；附件内容寻址写回。设计见
@@ -204,6 +215,11 @@ Host 直接读盘；只走官方 `sessionPersistence.create/append/flush/close`�
    临时 3099 Host 与 headless Agent 均成功安装两工具（`job-tools-status.json` installed 含真实 session id）；
    用户隔离 headless 真实 E2E 通过：`bash-7f92880f64174bf6` → `job_wait` 3044ms completed → `job_read(summary)` = `tick1..3 / JOB-OK`，无 sleep；
    证据 `.superpowers/sdd/2026-10-23-job-tools/evidence/e2e-live.jsonl`；当前 3080 Host 仍是旧进程，重启后可在本会话复验。
+   2026-10-24（D-024）：goal 确认门会话级开关已实现：命令 `/goal-confirm`、卡片第三项、composer dock 开关；
+   单测 goal-confirm 53/53（全部 workspace 套件 0 失败）；真实 `SessionProjectionRegistry` spike 验证
+   off/wait/reset 的 stateOf + wire + checkpoint + restore，并修掉 `wire.viewSchema` 嵌套 bug；
+   临时 3099 Host（`DSH_HOME=/tmp/dshhome` 的 profile 副本）激活成功（`goal-confirm-status.json` pid 804895、无 goal-confirm 告警），
+   client bundle 服务端可取且语法通过；**待用户重启 3080 Host** 后跑真实 Web E2E（状态文件应出现 `effective`/`skipped` 字段）。
    2026-11-02（D-025）：Session 导入实现完成：单测 28/28、全工作区 214/214；真实 jsonl 后端 E2E 通过
    （导入两次、id 冲突改 `session-<uuid>`、`list/open` 读回 2003 事件、落盘 `type/seq` 序列一致、坏行拒绝且不留半成品）；
    Web `/import` 真机待 3080 Host 重启后验。

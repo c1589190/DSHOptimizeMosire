@@ -5,9 +5,20 @@ import {
   CANCEL_LABEL,
   CONTINUE_LABEL,
   DEFAULT_CONFIG,
+  DEFAULT_SESSION_STATE,
+  SESSION_OFF_LABEL,
+  SESSION_PROJECTION_KEY,
+  SESSION_STATE_VERSION,
   buildQuestion,
   decideOutcome,
+  describeTimeout,
+  foldCommand,
+  formatStatus,
+  hasOverride,
+  isSessionState,
   normalizeConfig,
+  parseCommandInput,
+  resolveConfig,
   summarizeObjective,
 } from '../lib/decision.js'
 
@@ -36,10 +47,11 @@ test('normalizeConfig: enabled and cancelOnClose must be booleans', () => {
   assert.throws(() => normalizeConfig({ cancelOnClose: 'false' }), /cancelOnClose must be a boolean/)
 })
 
-test('normalizeConfig: timeoutSeconds must be an integer in 1..3600', () => {
-  for (const invalid of [0, -1, 3601, 1.5, Number.NaN, '30', Infinity]) {
-    assert.throws(() => normalizeConfig({ timeoutSeconds: invalid }), /timeoutSeconds must be an integer between 1 and 3600/)
+test('normalizeConfig: timeoutSeconds must be an integer in 0..3600 (0 = wait for a human)', () => {
+  for (const invalid of [-1, 3601, 1.5, Number.NaN, '30', Infinity]) {
+    assert.throws(() => normalizeConfig({ timeoutSeconds: invalid }), /timeoutSeconds must be an integer between 0 and 3600/)
   }
+  assert.equal(normalizeConfig({ timeoutSeconds: 0 }).timeoutSeconds, 0)
   assert.equal(normalizeConfig({ timeoutSeconds: 1 }).timeoutSeconds, 1)
   assert.equal(normalizeConfig({ timeoutSeconds: 3600 }).timeoutSeconds, 3600)
 })
@@ -52,6 +64,96 @@ test('normalizeConfig: valid values are preserved', () => {
   })
 })
 
+test('isSessionState: accepts the override shape, rejects everything else', () => {
+  assert.equal(isSessionState(DEFAULT_SESSION_STATE), true)
+  assert.equal(isSessionState({ enabled: false, timeoutSeconds: null }), true)
+  assert.equal(isSessionState({ enabled: null, timeoutSeconds: 0 }), true)
+  assert.equal(isSessionState({ enabled: true, timeoutSeconds: 3600 }), true)
+  for (const invalid of [null, undefined, 'off', 0, [], { enabled: 'no', timeoutSeconds: null }, { enabled: null, timeoutSeconds: -1 }, { enabled: null, timeoutSeconds: 3601 }, { enabled: null, timeoutSeconds: null, extra: 1 }]) {
+    assert.equal(isSessionState(invalid), false, JSON.stringify(invalid))
+  }
+})
+
+test('hasOverride: only a non-null field counts as an override', () => {
+  assert.equal(hasOverride(DEFAULT_SESSION_STATE), false)
+  assert.equal(hasOverride({ enabled: true, timeoutSeconds: null }), true)
+  assert.equal(hasOverride({ enabled: null, timeoutSeconds: 0 }), true)
+  assert.equal(hasOverride(undefined), false)
+})
+
+test('resolveConfig: the session override wins per field, cancelOnClose stays global', () => {
+  const config = { enabled: true, timeoutSeconds: 30, cancelOnClose: true }
+  assert.deepEqual(resolveConfig(config, DEFAULT_SESSION_STATE), config)
+  assert.deepEqual(resolveConfig(config, { enabled: false, timeoutSeconds: null }), { enabled: false, timeoutSeconds: 30, cancelOnClose: true })
+  assert.deepEqual(resolveConfig(config, { enabled: null, timeoutSeconds: 5 }), { enabled: true, timeoutSeconds: 5, cancelOnClose: true })
+  assert.deepEqual(resolveConfig(config, { enabled: true, timeoutSeconds: 0 }), { enabled: true, timeoutSeconds: 0, cancelOnClose: true })
+  assert.deepEqual(resolveConfig(config, null), config)
+  assert.deepEqual(resolveConfig(config, { bogus: true }), config)
+})
+
+test('describeTimeout: zero reads as waiting for a human', () => {
+  assert.equal(describeTimeout(0), '等待人工确认（不自动继续）')
+  assert.equal(describeTimeout(30), '30 秒无操作自动继续')
+})
+
+test('parseCommandInput: bare invocation is status', () => {
+  assert.deepEqual(parseCommandInput(''), { kind: 'status' })
+  assert.deepEqual(parseCommandInput('   '), { kind: 'status' })
+  assert.deepEqual(parseCommandInput(undefined), { kind: 'status' })
+})
+
+test('parseCommandInput: on / off / wait / reset and aliases', () => {
+  assert.deepEqual(parseCommandInput('on'), { kind: 'set', state: { enabled: true, timeoutSeconds: null } })
+  assert.deepEqual(parseCommandInput('  OFF  '), { kind: 'set', state: { enabled: false, timeoutSeconds: null } })
+  assert.deepEqual(parseCommandInput('wait'), { kind: 'set', state: { enabled: true, timeoutSeconds: 0 } })
+  assert.deepEqual(parseCommandInput('reset'), { kind: 'reset' })
+  assert.deepEqual(parseCommandInput('default'), { kind: 'reset' })
+})
+
+test('parseCommandInput: timeout takes one integer in 0..3600', () => {
+  assert.deepEqual(parseCommandInput('timeout 60'), { kind: 'set', state: { enabled: true, timeoutSeconds: 60 } })
+  assert.deepEqual(parseCommandInput('timeout 0'), { kind: 'set', state: { enabled: true, timeoutSeconds: 0 } })
+  assert.deepEqual(parseCommandInput('timeout 3600'), { kind: 'set', state: { enabled: true, timeoutSeconds: 3600 } })
+  for (const invalid of ['timeout', 'timeout abc', 'timeout 1.5', 'timeout -1', 'timeout 3601', 'timeout 5 extra']) {
+    assert.equal(parseCommandInput(invalid).kind, 'error', invalid)
+  }
+  assert.match(parseCommandInput('timeout 3601').message, /0\.\.3600/)
+})
+
+test('parseCommandInput: extra arguments and unknown words are errors with usage', () => {
+  assert.equal(parseCommandInput('off now').kind, 'error')
+  assert.equal(parseCommandInput('on extra').kind, 'error')
+  assert.equal(parseCommandInput('reset all').kind, 'error')
+  assert.match(parseCommandInput('pause').message, /on\|off\|wait\|timeout <秒数>\|reset/)
+})
+
+test('foldCommand: set/reset produce the new state, status/error keep the reference', () => {
+  const state = { enabled: null, timeoutSeconds: null }
+  assert.deepEqual(foldCommand(state, 'off'), { enabled: false, timeoutSeconds: null })
+  assert.deepEqual(foldCommand(state, 'wait'), { enabled: true, timeoutSeconds: 0 })
+  assert.deepEqual(foldCommand(state, 'timeout 12'), { enabled: true, timeoutSeconds: 12 })
+  assert.equal(foldCommand(state, 'reset'), DEFAULT_SESSION_STATE)
+  assert.equal(foldCommand(state, ''), state)
+  assert.equal(foldCommand(state, 'bogus'), state)
+  assert.equal(foldCommand(undefined, ''), DEFAULT_SESSION_STATE)
+})
+
+test('formatStatus: three layers with a usage line', () => {
+  const config = DEFAULT_CONFIG
+  const text = formatStatus(config, DEFAULT_SESSION_STATE)
+  assert.match(text, /Goal 续轮确认：30 秒无操作自动继续/)
+  assert.match(text, /全局默认：30 秒无操作自动继续/)
+  assert.match(text, /本会话：跟随全局/)
+  assert.match(text, /用法：\/goal-confirm on\|off\|wait\|timeout <秒数>\|reset/)
+  assert.match(formatStatus(config, { enabled: false, timeoutSeconds: null }), /本会话：关闭/)
+  assert.match(formatStatus(config, { enabled: true, timeoutSeconds: 0 }), /本会话：等待人工确认/)
+})
+
+test('the projection key and state version are pinned', () => {
+  assert.equal(SESSION_PROJECTION_KEY, 'goal-confirm')
+  assert.equal(SESSION_STATE_VERSION, 1)
+})
+
 test('buildQuestion: exact header, id, labels and round text', () => {
   const question = buildQuestion({ round: 3, maxGoalRounds: 5, objective: 'ship the gate', timeoutSeconds: 30 })
   assert.equal(question.id, 'goal-round')
@@ -60,8 +162,9 @@ test('buildQuestion: exact header, id, labels and round text', () => {
   assert.match(question.question, /第 3 轮（上限 5）/)
   assert.equal(CONTINUE_LABEL, '继续自动推进')
   assert.equal(CANCEL_LABEL, '取消并删除 goal')
-  assert.deepEqual(question.options.map((option) => option.label), [CONTINUE_LABEL, CANCEL_LABEL])
-  assert.equal(question.options.length, 2)
+  assert.equal(SESSION_OFF_LABEL, '本会话不再确认')
+  assert.deepEqual(question.options.map((option) => option.label), [CONTINUE_LABEL, CANCEL_LABEL, SESSION_OFF_LABEL])
+  assert.equal(question.options.length, 3)
   for (const option of question.options) assert.equal(typeof option.description, 'string')
 })
 
@@ -70,6 +173,12 @@ test('buildQuestion: detail carries the timeout and an objective summary', () =>
   assert.match(question.detail, /5 秒无操作将自动继续/)
   assert.match(question.detail, /目标：build the confirmation gate/)
   assert.match(question.detail, /关闭本卡片视为取消并删除 goal/)
+})
+
+test('buildQuestion: timeout 0 says it waits for a human', () => {
+  const question = buildQuestion({ round: 1, maxGoalRounds: 3, objective: 'x', timeoutSeconds: 0 })
+  assert.match(question.detail, /等待人工确认，不会自动继续/)
+  assert.doesNotMatch(question.detail, /0 秒无操作/)
 })
 
 test('summarizeObjective: collapses whitespace and truncates with an ellipsis', () => {
@@ -91,6 +200,13 @@ test('decideOutcome: answers map by exact option label', () => {
   assert.equal(decideOutcome({ kind: 'answer' }, config), 'continue')
   assert.equal(decideOutcome({ kind: 'answer', selected: undefined }, config), 'continue')
   assert.equal(decideOutcome({ kind: 'answer', selected: ['something else'] }, config), 'continue')
+})
+
+test('decideOutcome: the session-off option wins over the other labels', () => {
+  const config = { cancelOnClose: true }
+  assert.equal(decideOutcome({ kind: 'answer', selected: [SESSION_OFF_LABEL] }, config), 'continue-off')
+  assert.equal(decideOutcome({ kind: 'answer', selected: [CONTINUE_LABEL, SESSION_OFF_LABEL] }, config), 'continue-off')
+  assert.equal(decideOutcome({ kind: 'answer', selected: [CANCEL_LABEL, SESSION_OFF_LABEL] }, config), 'continue-off')
 })
 
 test('decideOutcome: closing the card follows cancelOnClose', () => {

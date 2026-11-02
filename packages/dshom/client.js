@@ -23,6 +23,39 @@ window.__ModuleLoader__.load({
       },
     };
 
+    const GC_NS = 'goal-confirm';
+
+    const GC_DICTS = {
+      zh: {
+        label: '续轮确认',
+        title: 'Goal 自动续轮确认门（仅本会话）',
+        'state.inherit': '默认',
+        'state.on': '开',
+        'state.wait': '等待',
+        'state.off': '关',
+        'opt.inherit': '默认（跟随全局）',
+        'opt.on': '开启确认门',
+        'opt.wait': '等待人工确认',
+        'opt.off': '本会话关闭',
+        'menu.label': '本会话续轮确认',
+        error: '设置失败',
+      },
+      en: {
+        label: 'Goal gate',
+        title: 'Goal round confirmation gate (this session only)',
+        'state.inherit': 'Default',
+        'state.on': 'On',
+        'state.wait': 'Wait',
+        'state.off': 'Off',
+        'opt.inherit': 'Default (follow profile)',
+        'opt.on': 'Enable the gate',
+        'opt.wait': 'Wait for a human',
+        'opt.off': 'Disable for this session',
+        'menu.label': 'Goal confirmation gate for this session',
+        error: 'Could not change it',
+      },
+    };
+
     const CSS = [
       '.mosire-timing{display:inline-flex;align-items:center;white-space:nowrap;font-size:11px;line-height:18px;color:var(--dsw-alias-label-secondary);font-variant-numeric:tabular-nums;user-select:none;margin-left:auto;padding:0 2px}',
       '.mosire-timing-tail{display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:baseline;gap:4px 12px;box-sizing:border-box;width:100%;margin-top:8px;font-size:11px;line-height:18px;color:var(--dsw-alias-label-secondary);font-variant-numeric:tabular-nums;user-select:none;text-align:right}',
@@ -30,6 +63,20 @@ window.__ModuleLoader__.load({
       '.mosire-timing-tail-item,.mosire-timing-tail-more{white-space:nowrap}',
       '.mosire-timing-tail-item b{font-weight:500;color:var(--dsw-alias-label-primary)}',
       '.mosire-timing-live{position:fixed;z-index:40;pointer-events:none;white-space:nowrap;font-size:11px;line-height:18px;color:var(--dsw-alias-label-secondary);font-variant-numeric:tabular-nums;user-select:none;padding:0 6px;border-radius:6px;background:color-mix(in srgb, var(--dsw-alias-bg-base) 88%, transparent);box-shadow:0 0 0 1px var(--dsw-alias-border-l1)}',
+      '.mosire-goal-confirm{display:inline-flex;align-items:center;font-size:11px;line-height:18px;color:var(--dsw-alias-label-secondary);user-select:none}',
+      '.mosire-goal-confirm-btn{display:inline-flex;align-items:center;gap:6px;border:0;background:transparent;padding:0 4px;border-radius:6px;color:inherit;font:inherit;font-size:11px;line-height:18px;cursor:pointer}',
+      '.mosire-goal-confirm-btn:hover{background:color-mix(in srgb, var(--dsw-alias-label-secondary) 14%, transparent)}',
+      '.mosire-goal-confirm-btn:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:1px}',
+      '.mosire-goal-confirm-btn[disabled]{opacity:.6;cursor:default}',
+      '.mosire-goal-confirm-dot{width:6px;height:6px;border-radius:50%;background:var(--dsw-alias-state-idle-primary)}',
+      '.mosire-goal-confirm[data-state="on"] .mosire-goal-confirm-dot{background:var(--dsw-alias-state-success-primary)}',
+      '.mosire-goal-confirm[data-state="wait"] .mosire-goal-confirm-dot{background:var(--dsw-alias-state-warn-primary)}',
+      '.mosire-goal-confirm[data-state="off"] .mosire-goal-confirm-dot{background:var(--dsw-alias-state-idle-primary);opacity:.5}',
+      '.mosire-goal-confirm-menu{position:fixed;z-index:60;display:flex;flex-direction:column;gap:2px;padding:4px;border-radius:8px;background:var(--dsw-alias-bg-overlay);box-shadow:0 0 0 1px var(--dsw-alias-border-l1),0 8px 24px rgba(0,0,0,.18)}',
+      '.mosire-goal-confirm-item{border:0;background:transparent;color:var(--dsw-alias-label-primary);font:inherit;font-size:12px;line-height:20px;text-align:left;white-space:nowrap;padding:4px 10px;border-radius:6px;cursor:pointer}',
+      '.mosire-goal-confirm-item:hover{background:color-mix(in srgb, var(--dsw-alias-label-primary) 8%, transparent)}',
+      '.mosire-goal-confirm-item[aria-checked="true"]{color:var(--dsw-alias-brand-primary)}',
+      '.mosire-goal-confirm-error{color:var(--dsw-alias-state-error-primary);font-size:11px;line-height:18px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
     ].join('');
 
     const styleTag = () => h('style', null, CSS);
@@ -260,10 +307,174 @@ window.__ModuleLoader__.load({
       }, label.text)));
     }
 
+    /**
+     * Effective gate state from the projection wire value and profile defaults.
+     * A missing projection reads as "follow the profile" with the shipped
+     * defaults, so the control renders before the first frame arrives.
+     */
+    function goalConfirmSnapshot(raw) {
+      const value = raw !== null && typeof raw === 'object' ? raw : {};
+      const global = value.global !== null && typeof value.global === 'object'
+        ? value.global
+        : { enabled: true, timeoutSeconds: 30 };
+      const overrideEnabled = value.enabled === true || value.enabled === false ? value.enabled : null;
+      const overrideTimeout = Number.isInteger(value.timeoutSeconds) ? value.timeoutSeconds : null;
+      const enabled = overrideEnabled ?? global.enabled;
+      const timeoutSeconds = overrideTimeout ?? global.timeoutSeconds;
+      const mode = enabled === false ? 'off' : timeoutSeconds === 0 ? 'wait' : 'on';
+      return {
+        mode,
+        inherited: overrideEnabled === null && overrideTimeout === null,
+        enabled,
+        timeoutSeconds,
+      };
+    }
+
+    /**
+     * Per-session switch for the goal-round confirmation gate. The value is the
+     * host projection `goal-confirm`; every action is the same slash command the
+     * agent-facing card uses, so the session log stays the only writer.
+     */
+    function GoalConfirmSwitch(props) {
+      const useProjection = props.useProjection;
+      const sessionId = props.sessionId;
+      const remote = props.remote;
+      const t = typeof props.t === 'function' ? props.t : (key) => key;
+      const raw = typeof useProjection === 'function' ? useProjection('goal-confirm') : undefined;
+      const state = goalConfirmSnapshot(raw);
+      const [menu, setMenu] = React.useState(null);
+      const [busy, setBusy] = React.useState(false);
+      const [error, setError] = React.useState(null);
+      const rootRef = React.useRef(null);
+      const buttonRef = React.useRef(null);
+
+      React.useEffect(() => {
+        if (error === null) return undefined;
+        const timer = window.setTimeout(() => setError(null), 5000);
+        return () => window.clearTimeout(timer);
+      }, [error]);
+
+      React.useEffect(() => {
+        setMenu(null);
+        setError(null);
+      }, [sessionId]);
+
+      React.useEffect(() => {
+        if (menu === null) return undefined;
+        const onDown = (event) => {
+          if (rootRef.current !== null && event.target instanceof Node && rootRef.current.contains(event.target)) return;
+          setMenu(null);
+        };
+        const onKey = (event) => {
+          if (event.key === 'Escape') setMenu(null);
+        };
+        const onViewport = () => setMenu(null);
+        document.addEventListener('pointerdown', onDown, true);
+        document.addEventListener('keydown', onKey);
+        window.addEventListener('resize', onViewport);
+        window.addEventListener('scroll', onViewport, true);
+        return () => {
+          document.removeEventListener('pointerdown', onDown, true);
+          document.removeEventListener('keydown', onKey);
+          window.removeEventListener('resize', onViewport);
+          window.removeEventListener('scroll', onViewport, true);
+        };
+      }, [menu]);
+
+      if (typeof sessionId !== 'string' || sessionId === '') return null;
+
+      const openMenu = () => {
+        const button = buttonRef.current;
+        if (button === null) return;
+        const rect = button.getBoundingClientRect();
+        const width = 188;
+        const left = Math.max(8, Math.min(rect.left, window.innerWidth - width - 8));
+        const below = rect.top < 200;
+        setMenu({
+          left,
+          width,
+          ...(below ? { top: rect.bottom + 6 } : { bottom: window.innerHeight - rect.top + 6 }),
+        });
+      };
+
+      const run = async (arg) => {
+        setMenu(null);
+        if (remote === undefined || remote.commands === undefined || typeof remote.commands.execute !== 'function') {
+          setError('commands remote unavailable');
+          return;
+        }
+        setBusy(true);
+        setError(null);
+        try {
+          const result = await remote.commands.execute(sessionId, `/goal-confirm ${arg}`, []);
+          if (result !== null && typeof result === 'object' && result.ok === false) {
+            throw new Error(result.error && result.error.message ? result.error.message : 'command refused');
+          }
+          const value = result !== null && typeof result === 'object' && result.ok === true ? result.value : undefined;
+          if (value === undefined) throw new Error(`unknown command: /goal-confirm ${arg}`);
+          if (value.result !== null && typeof value.result === 'object' && value.result.kind === 'error') {
+            throw new Error(value.result.text || 'command failed');
+          }
+        } catch (failure) {
+          setError(String(failure !== null && typeof failure === 'object' && failure.message ? failure.message : failure));
+        } finally {
+          setBusy(false);
+        }
+      };
+
+      const valueLabel = state.inherited
+        ? t('state.inherit')
+        : state.mode === 'off' ? t('state.off') : state.mode === 'wait' ? t('state.wait') : `${state.timeoutSeconds}s`;
+      const modeText = state.mode === 'off'
+        ? t('opt.off')
+        : state.mode === 'wait' ? t('opt.wait') : `${state.timeoutSeconds}s`;
+      const title = `${t('title')} · ${modeText}`;
+      const items = [
+        { arg: 'reset', label: t('opt.inherit'), current: state.inherited },
+        { arg: 'on', label: t('opt.on'), current: !state.inherited && state.mode !== 'off' && state.mode !== 'wait' },
+        { arg: 'wait', label: t('opt.wait'), current: state.mode === 'wait' },
+        { arg: 'off', label: t('opt.off'), current: state.mode === 'off' },
+      ];
+
+      return h('div', { className: 'mosire-goal-confirm', 'data-state': state.mode, ref: rootRef },
+        h('button', {
+          type: 'button',
+          ref: buttonRef,
+          className: 'mosire-goal-confirm-btn',
+          title,
+          'aria-haspopup': 'menu',
+          'aria-expanded': menu !== null,
+          'aria-label': title,
+          disabled: busy,
+          onClick: () => (menu === null ? openMenu() : setMenu(null)),
+        },
+          h('span', { className: 'mosire-goal-confirm-dot', 'aria-hidden': 'true' }),
+          `${t('label')} · ${valueLabel}`),
+        menu === null ? null : h('div', {
+          className: 'mosire-goal-confirm-menu',
+          role: 'menu',
+          'aria-label': t('menu.label'),
+          style: {
+            left: `${menu.left}px`,
+            width: `${menu.width}px`,
+            ...(menu.top === undefined ? { bottom: `${menu.bottom}px` } : { top: `${menu.top}px` }),
+          },
+        }, items.map((item) => h('button', {
+          key: item.arg,
+          type: 'button',
+          role: 'menuitemradio',
+          'aria-checked': item.current,
+          className: 'mosire-goal-confirm-item',
+          onClick: () => run(item.arg),
+        }, item.label))),
+        error === null ? null : h('span', { className: 'mosire-goal-confirm-error', title: error }, `${t('error')}: ${error}`));
+    }
+
     return {
       inject: ['slots', 'locale'],
       apply(ctx) {
         ctx.effect(() => ctx.locale.register(NS, DICTS), 'timing-annotations: dictionaries');
+        ctx.effect(() => ctx.locale.register(GC_NS, GC_DICTS), 'goal-confirm: dictionaries');
         ctx.slots.inject('conversation.chat.assistant-actions', () => ctx.slots.register({
           name: 'conversation.chat.assistant-actions',
           id: 'timing-annotations',
@@ -282,7 +493,18 @@ window.__ModuleLoader__.load({
           order: 3,
           locale: NS,
         }, LiveTiming));
+        // Optional on purpose: a composition without command remotes keeps the
+        // timing annotations and simply omits the switch instead of failing.
+        ctx.inject(['remote.commands'], (remoteCtx) => {
+          ctx.slots.inject('conversation.composer.dock', () => ctx.slots.register({
+            name: 'conversation.composer.dock',
+            id: 'goal-confirm-switch',
+            order: 4,
+            locale: GC_NS,
+          }, (props) => h(GoalConfirmSwitch, Object.assign({}, props, { remote: remoteCtx.remote }))));
+        });
       },
     };
   },
 });
+

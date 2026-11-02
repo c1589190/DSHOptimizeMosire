@@ -5,18 +5,24 @@ import { join } from 'node:path'
 import test from 'node:test'
 
 import { apply } from '../lib/index.js'
-import { CANCEL_LABEL, CONTINUE_LABEL } from '../lib/decision.js'
+import { CANCEL_LABEL, CONTINUE_LABEL, SESSION_OFF_LABEL } from '../lib/decision.js'
 
 // Keep the diagnostic status file out of the real DSH_HOME.
 const statusHome = mkdtempSync(join(tmpdir(), 'goal-confirm-test-'))
 process.env.DSH_HOME = statusHome
 const statusPath = join(statusHome, 'goal-confirm-status.json')
 
-/** Minimal Cordis context: capture listeners, serve the two optional services. */
-function makeCtx({ goals, questions, logger } = {}) {
+/** Minimal Cordis context: capture listeners, serve the optional services. */
+function makeCtx({ goals, questions, logger, commands, projections, gateway } = {}) {
   const onCalls = []
   const listeners = new Map()
-  const services = { goals, userQuestions: questions }
+  const services = {
+    goals,
+    userQuestions: questions,
+    commands,
+    sessionProjections: projections,
+    typertGateway: gateway,
+  }
   return {
     onCalls,
     listeners,
@@ -33,7 +39,8 @@ function makeCtx({ goals, questions, logger } = {}) {
 }
 
 function makeAgent({ id = 'session-1', delegationDepth = 0 } = {}) {
-  return { id, session: { header: { delegationDepth } } }
+  const session = { header: { delegationDepth }, id }
+  return { id, session }
 }
 
 function goalMessage(round, { id = 'm1', source = {} } = {}) {
@@ -98,6 +105,43 @@ function makeQuestions(respond) {
   }
 }
 
+/** Fake command service: records registrations and runs the handler on execute. */
+function makeCommands() {
+  const calls = { register: [], execute: [] }
+  const service = {
+    calls,
+    register(definition) {
+      calls.register.push(definition)
+      return () => {}
+    },
+    async execute(agent, line, attachments, signal) {
+      calls.execute.push({ agent, line, attachments, signal })
+      const definition = calls.register[0]
+      const prefix = '/goal-confirm'
+      const rawInput = typeof line === 'string' && line.startsWith(prefix) ? line.slice(prefix.length) : ''
+      if (definition !== undefined) await definition.handler({ agent, rawInput, signal })
+      return { result: { kind: 'success' } }
+    },
+  }
+  return service
+}
+
+/** Fake session projections: records the definition and serves one state. */
+function makeProjections(stateFor = () => ({ enabled: null, timeoutSeconds: null })) {
+  const calls = { register: [], stateOf: [] }
+  return {
+    calls,
+    register(definition) {
+      calls.register.push(definition)
+      return () => {}
+    },
+    stateOf(session, key) {
+      calls.stateOf.push({ session, key })
+      return stateFor(session, key)
+    },
+  }
+}
+
 function errorWith(code) {
   const error = new Error(code)
   error.code = code
@@ -113,9 +157,16 @@ function rejectWith(code) {
 function makeHarness(options = {}) {
   const goals = Object.hasOwn(options, 'goals') ? options.goals : makeGoals(makeGoal())
   const questions = Object.hasOwn(options, 'questions') ? options.questions : makeQuestions()
-  const ctx = makeCtx({ goals, questions, logger: options.logger })
+  const ctx = makeCtx({
+    goals,
+    questions,
+    logger: options.logger,
+    commands: options.commands,
+    projections: options.projections,
+    gateway: options.gateway,
+  })
   apply(ctx, options.config ?? {})
-  return { ctx, goals, questions }
+  return { ctx, goals, questions, commands: options.commands, projections: options.projections }
 }
 
 async function runPreStep(fakeCtx, messages, agent = makeAgent()) {
@@ -179,7 +230,7 @@ test('b. active + armed goal round asks once and the continue answer lets it thr
   assert.equal(request.questions[0].id, 'goal-round')
   assert.equal(request.questions[0].header, 'Goal 续轮')
   assert.match(request.questions[0].question, /第 3 轮（上限 5）/)
-  assert.deepEqual(request.questions[0].options.map((option) => option.label), [CONTINUE_LABEL, CANCEL_LABEL])
+  assert.deepEqual(request.questions[0].options.map((option) => option.label), [CONTINUE_LABEL, CANCEL_LABEL, SESSION_OFF_LABEL])
 
   const status = readStatus()
   assert.equal(status.activated, true)
@@ -190,6 +241,7 @@ test('b. active + armed goal round asks once and the continue answer lets it thr
   assert.equal(status.outcome, 'answer')
   assert.equal(status.cleared, false)
   assert.ok(Date.parse(status.at) > 0)
+  assert.deepEqual(status.effective, { enabled: true, timeoutSeconds: 30, cancelOnClose: true })
 })
 
 test('c. paused, blocked and disarmed goals pass through without asking', async () => {
@@ -304,7 +356,7 @@ test('i2. the plugin timeout aborts its own ask and continues the round', { time
       })
     },
   }
-  const { ctx, goals } = makeHarness({ questions, config: { timeoutSeconds: 1 } })
+  const { ctx } = makeHarness({ questions, config: { timeoutSeconds: 1 } })
   const startedAt = Date.now()
   const result = await runPreStep(ctx, [goalMessage(3)])
   const elapsed = Date.now() - startedAt
@@ -312,7 +364,6 @@ test('i2. the plugin timeout aborts its own ask and continues the round', { time
   assert.ok(elapsed >= 900, `the gate must wait for its timeout, waited ${elapsed}ms`)
   assert.ok(elapsed < 4000, `the gate must not hang, waited ${elapsed}ms`)
   assert.equal(questions.calls.length, 1)
-  assert.equal(goals.calls.clear.length, 0)
   assert.equal(result.nextCalls.length, 1)
 
   const status = readStatus()
@@ -372,15 +423,192 @@ test('j2. concurrent pre-step invocations share one in-flight ask', async () => 
 })
 
 test('k. enabled:false registers nothing', () => {
-  const { ctx, questions } = makeHarness({ config: { enabled: false } })
+  const commands = makeCommands()
+  const projections = makeProjections()
+  const { ctx, questions } = makeHarness({ config: { enabled: false }, commands, projections })
   assert.equal(ctx.onCalls.length, 0)
   assert.equal(questions.calls.length, 0)
+  assert.equal(commands.calls.register.length, 0)
+  assert.equal(projections.calls.register.length, 0)
   assert.equal(readStatus().config.enabled, false)
+})
+
+test('l. a session override of enabled:false skips the card for that session only', async () => {
+  const projections = makeProjections((session) => (session?.id === 'session-off'
+    ? { enabled: false, timeoutSeconds: null }
+    : { enabled: null, timeoutSeconds: null }))
+  const { ctx, questions } = makeHarness({ projections })
+
+  const off = await runPreStep(ctx, [goalMessage(3)], makeAgent({ id: 'session-off' }))
+  assert.equal(off.nextCalls.length, 1)
+  assert.equal(questions.calls.length, 0)
+  assert.equal(readStatus().skipped, 'session-off')
+
+  const on = await runPreStep(ctx, [goalMessage(3)], makeAgent({ id: 'session-on' }))
+  assert.equal(on.nextCalls.length, 1)
+  assert.equal(questions.calls.length, 1)
+})
+
+test('m. a session timeout override reaches the card detail', async () => {
+  const projections = makeProjections(() => ({ enabled: true, timeoutSeconds: 2 }))
+  const { ctx, questions } = makeHarness({ projections })
+  const { nextCalls } = await runPreStep(ctx, [goalMessage(3)])
+  assert.equal(questions.calls.length, 1)
+  assert.match(questions.calls[0].questions[0].detail, /2 秒无操作将自动继续/)
+  assert.equal(nextCalls.length, 1)
+})
+
+test('n. a wait session asks without a timer and survives a live client', async () => {
+  const projections = makeProjections(() => ({ enabled: true, timeoutSeconds: 0 }))
+  const gateway = { hasLiveClient: () => true }
+  const { ctx, questions } = makeHarness({ projections, gateway })
+  const startedAt = Date.now()
+  const { nextCalls } = await runPreStep(ctx, [goalMessage(3)])
+  assert.ok(Date.now() - startedAt < 1000, 'a wait ask must not arm the timeout timer')
+  assert.equal(questions.calls.length, 1)
+  assert.match(questions.calls[0].questions[0].detail, /等待人工确认/)
+  assert.equal(nextCalls.length, 1)
+})
+
+test('n2. a wait session with no live client passes the round through', async () => {
+  const projections = makeProjections(() => ({ enabled: true, timeoutSeconds: 0 }))
+  const gateway = { hasLiveClient: () => false }
+  const { ctx, questions } = makeHarness({ projections, gateway })
+  const { nextCalls } = await runPreStep(ctx, [goalMessage(3)])
+  assert.equal(questions.calls.length, 0)
+  assert.equal(nextCalls.length, 1)
+  assert.equal(readStatus().skipped, 'no-live-client')
+})
+
+test('o. the card session-off option records off through the command and continues', async () => {
+  const commands = makeCommands()
+  const questions = makeQuestions(() => ({ answers: [{ id: 'goal-round', selected: [SESSION_OFF_LABEL] }] }))
+  const { ctx } = makeHarness({ commands, questions })
+  const agent = makeAgent()
+  const { nextCalls } = await runPreStep(ctx, [goalMessage(3)], agent)
+
+  assert.equal(commands.calls.execute.length, 1)
+  assert.equal(commands.calls.execute[0].agent, agent)
+  assert.equal(commands.calls.execute[0].line, '/goal-confirm off')
+  assert.equal(nextCalls.length, 1)
+  assert.equal(readStatus().action, 'continue-off')
+
+  // The next round in the same session no longer asks.
+  const second = await runPreStep(ctx, [goalMessage(4, { id: 'm2' })], agent)
+  assert.equal(second.nextCalls.length, 1)
+  assert.equal(questions.calls.length, 1)
+})
+
+test('o2. a failing command service falls back to the in-memory switch', async () => {
+  const commands = {
+    calls: [],
+    register() {
+      return () => {}
+    },
+    async execute() {
+      throw errorWith('COMMAND_FAILED')
+    },
+  }
+  const logger = { warnings: [], warn(message) { this.warnings.push(message) } }
+  const questions = makeQuestions(() => ({ answers: [{ id: 'goal-round', selected: [SESSION_OFF_LABEL] }] }))
+  const { ctx } = makeHarness({ commands, questions, logger })
+  const agent = makeAgent()
+  await runPreStep(ctx, [goalMessage(3)], agent)
+  assert.ok(logger.warnings.some((message) => /off failed/.test(message)))
+
+  const second = await runPreStep(ctx, [goalMessage(4, { id: 'm2' })], agent)
+  assert.equal(second.nextCalls.length, 1)
+  assert.equal(questions.calls.length, 1)
+})
+
+test('p. activation registers /goal-confirm and its handler reports the session state', async () => {
+  const commands = makeCommands()
+  const { ctx, questions } = makeHarness({ commands })
+  assert.equal(commands.calls.register.length, 1)
+  const definition = commands.calls.register[0]
+  assert.equal(definition.name, 'goal-confirm')
+  assert.equal(typeof definition.handler, 'function')
+
+  const agent = makeAgent()
+  const off = await definition.handler({ agent, rawInput: ' off ' })
+  assert.equal(off.kind, 'success')
+  assert.match(off.text, /本会话：关闭/)
+  const status = await definition.handler({ agent, rawInput: '' })
+  assert.match(status.text, /Goal 续轮确认：关闭（本会话不弹卡）/)
+  const bad = await definition.handler({ agent, rawInput: 'nope' })
+  assert.equal(bad.kind, 'error')
+  assert.match(bad.text, /on\|off\|wait\|timeout/)
+
+  // The switch is in memory even without a projection: the next round skips.
+  const result = await runPreStep(ctx, [goalMessage(3)], agent)
+  assert.equal(result.nextCalls.length, 1)
+  assert.equal(questions.calls.length, 0)
+})
+
+test('p2. /goal-confirm wait without a projection still asks without a timer', async () => {
+  const commands = makeCommands()
+  const { ctx, questions } = makeHarness({ commands })
+  const agent = makeAgent()
+  const definition = commands.calls.register[0]
+  await definition.handler({ agent, rawInput: 'wait' })
+
+  const { nextCalls } = await runPreStep(ctx, [goalMessage(3)], agent)
+  assert.equal(questions.calls.length, 1)
+  assert.match(questions.calls[0].questions[0].detail, /等待人工确认/)
+  assert.equal(nextCalls.length, 1)
+})
+
+test('q. the session projection folds command/run and exposes a stable wire view', () => {
+  const projections = makeProjections()
+  makeHarness({ projections })
+  assert.equal(projections.calls.register.length, 1)
+  const definition = projections.calls.register[0]
+  assert.equal(definition.key, 'goal-confirm')
+  assert.equal(definition.stateVersion, 1)
+  assert.deepEqual(definition.init(), { enabled: null, timeoutSeconds: null })
+
+  const initial = definition.init()
+  const off = definition.apply(initial, { type: 'command/run', data: { name: 'goal-confirm', args: 'off' } })
+  assert.deepEqual(off, { enabled: false, timeoutSeconds: null })
+  const wait = definition.apply(off, { type: 'command/run', data: { name: 'goal-confirm', args: 'wait' } })
+  assert.deepEqual(wait, { enabled: true, timeoutSeconds: 0 })
+  const reset = definition.apply(wait, { type: 'command/run', data: { name: 'goal-confirm', args: 'reset' } })
+  assert.deepEqual(reset, { enabled: null, timeoutSeconds: null })
+
+  // Ignored events keep the exact reference, so the projection does no work.
+  assert.equal(definition.apply(off, { type: 'assistant/message' }), off)
+  assert.equal(definition.apply(off, { type: 'command/run', data: { name: 'goal' } }), off)
+
+  const view = definition.wire.view(off)
+  assert.deepEqual(view, { enabled: false, timeoutSeconds: null, global: { enabled: true, timeoutSeconds: 30 } })
+  assert.equal(definition.wire.view(off), view)
+  assert.equal(definition.stateSchema.parse(off), off)
+  assert.equal(definition.wire.viewSchema.parse(view), view)
+  assert.throws(() => definition.stateSchema.parse({ enabled: 'yes' }), /invalid state projection value/)
+  assert.equal(definition.stateSchema.safeParse({ enabled: 'yes' }).success, false)
+})
+
+test('r. a projection read that throws falls back to the default without blocking', async () => {
+  const logger = { warnings: [], warn(message) { this.warnings.push(message) } }
+  const projections = {
+    calls: { register: [] },
+    register() {
+      return () => {}
+    },
+    stateOf() {
+      throw new Error('projection unavailable')
+    },
+  }
+  const { ctx, questions } = makeHarness({ projections, logger })
+  const result = await runPreStep(ctx, [goalMessage(3)])
+  assert.equal(result.nextCalls.length, 1)
+  assert.equal(questions.calls.length, 1)
+  assert.ok(logger.warnings.some((message) => /could not read the goal-confirm projection/.test(message)))
 })
 
 test('invalid config throws at activation and registers nothing', () => {
   const ctx = makeCtx({})
-  assert.throws(() => apply(ctx, { timeoutSeconds: 0 }), /timeoutSeconds must be an integer/)
+  assert.throws(() => apply(ctx, { timeoutSeconds: -1 }), /timeoutSeconds must be an integer/)
   assert.throws(() => apply(ctx, { typo: true }), /unknown config key/)
   assert.equal(ctx.onCalls.length, 0)
 })

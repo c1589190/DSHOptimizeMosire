@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "DSH Optimize Mosire (dshom)",
-    "description": "One bundle for the LiangShen anchored presets, goal-round confirmation gate, parent-to-child sub-agent tools, and live/post-run chat timing annotations."
+    "description": "One bundle for the LiangShen anchored presets, goal-round confirmation gate (with per-session on/off/wait switches and a composer-dock control), parent-to-child sub-agent tools, background job wait/read tools, and live/post-run chat timing annotations."
   }
 }

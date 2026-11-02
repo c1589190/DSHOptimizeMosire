@@ -13,16 +13,28 @@
  *     and then `next()`; the driver sees the cleared goal and rejects the round
  *     itself. The gate never fabricates a `reject`, so it cannot fight the
  *     driver's claimed-message restoration.
+ *   -「本会话不再确认」 → record `off` for this session through
+ *     `ctx.commands.execute('/goal-confirm off')` (so the session log owns the
+ *     setting) and continue this round.
  *   - No answer within `timeoutSeconds` → the ask is aborted and the round
- *     continues (an unattended session must not hang).
+ *     continues (an unattended session must not hang). `timeoutSeconds: 0`
+ *     means "wait for a human" and is intentionally allowed per session.
+ *
+ * PER-SESSION SWITCH: the effective config is the profile-level config
+ * overridden by the session state folded from `/goal-confirm` commands
+ * (`sessionProjections` key `goal-confirm`), with an in-memory fallback for
+ * compositions without that service. The `/goal-confirm` command, the card's
+ * third option and the Web composer-dock switch all write through the same
+ * command, so the session log stays the only authority.
  *
  * FAIL-OPEN BY DESIGN: a missing service, an unconvincing goal view, a
- * delegated (sub) agent, an ask error or a failed clear must never block or
- * kill a session. Every gate failure degrades to `next()` / `continue`.
+ * delegated (sub) agent, an ask error, a failed clear or a failed session-off
+ * write must never block or kill a session. Every gate failure degrades to
+ * `next()` / `continue`.
  *
  * CONFIG (validated at activation, so a typo fails where it is visible):
  *   - `enabled`: boolean, default true; false registers no listener at all.
- *   - `timeoutSeconds`: integer 1..3600, default 30.
+ *   - `timeoutSeconds`: integer 0..3600, default 30; 0 waits for a human.
  *   - `cancelOnClose`: boolean, default true; false turns a closed card into
  *     "continue this round, keep the goal".
  *
@@ -35,7 +47,17 @@ import { mkdirSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 
-import { buildQuestion, decideOutcome, normalizeConfig } from './decision.js'
+import {
+  COMMAND_NAME,
+  DEFAULT_SESSION_STATE,
+  buildQuestion,
+  decideOutcome,
+  formatStatus,
+  normalizeConfig,
+  parseCommandInput,
+  resolveConfig,
+} from './decision.js'
+import { createSessionState } from './session-state.js'
 
 /** Cordis plugin name used by loader diagnostics. */
 export const name = 'goal-confirm'
@@ -44,7 +66,8 @@ export const name = 'goal-confirm'
  * Deliberately NO inject list: `goals` and `userQuestions` are optional
  * services in headless/TUI compositions, and a hard injection would make the
  * plugin fail activation where there is nothing to ask. Both are resolved at
- * event time and a missing one fails open.
+ * event time and a missing one fails open. `commands`, `sessionProjections` and
+ * `typertGateway` are likewise optional and resolved lazily.
  */
 export const inject = []
 
@@ -82,11 +105,68 @@ export function apply(ctx, config) {
   writeStatus({ activated: true, pid: process.pid, config: cfg })
   if (cfg.enabled === false) return
 
+  const sessionState = createSessionState(ctx, cfg, warn)
+
+  /**
+   * Register the `/goal-confirm` command once, whether the service is already
+   * mounted or arrives later. The command's `command/run` record is the
+   * durable write; the projection folds it back on resume.
+   */
+  let commandRegistered = false
+  function registerCommand(commands) {
+    if (commandRegistered || commands === undefined || typeof commands.register !== 'function') return
+    commandRegistered = true
+    const definition = {
+      name: COMMAND_NAME,
+      description: '控制 goal 自动续轮确认门（本会话）：on / off / wait / timeout / reset',
+      input: { hint: 'on | off | wait | timeout <秒数> | reset' },
+      handler: (invocation) => runCommand(invocation),
+    }
+    try {
+      if (typeof ctx.effect === 'function') ctx.effect(() => commands.register(definition))
+      else commands.register(definition)
+    } catch (error) {
+      commandRegistered = false
+      warn(`could not register /${COMMAND_NAME}: ${String(error?.message ?? error)}`)
+    }
+  }
+
+  /** Answer one `/goal-confirm` invocation; the fold itself rides the log event. */
+  function runCommand(invocation) {
+    const agent = invocation?.agent
+    const rawInput = invocation?.rawInput
+    const parsed = parseCommandInput(rawInput)
+    if (parsed.kind === 'error') return { kind: 'error', text: parsed.message }
+    if (parsed.kind !== 'status' && agent !== undefined) sessionState.note(agent.id, rawInput)
+    const state = agent === undefined ? undefined : sessionState.stateFor(agent)
+    return { kind: 'success', text: formatStatus(cfg, state ?? DEFAULT_SESSION_STATE) }
+  }
+
+  registerCommand(ctx.get('commands'))
+  if (!commandRegistered && typeof ctx.inject === 'function') {
+    try {
+      ctx.inject(['commands'], (ready) => registerCommand((ready ?? ctx).get?.('commands')))
+    } catch (error) {
+      warn(`could not wait for the commands service: ${String(error?.message ?? error)}`)
+    }
+  }
+
+  /** Whether a Web page is connected; `undefined` means "cannot tell". */
+  function liveClient() {
+    try {
+      const gateway = ctx.get('typertGateway')
+      if (gateway === undefined || typeof gateway.hasLiveClient !== 'function') return undefined
+      return gateway.hasLiveClient() === true
+    } catch {
+      return undefined
+    }
+  }
+
   /**
    * Promise of the decision for one `${agent.id}:${round}` ask. Keeping the
    * promise (not just a boolean) lets a concurrent pre-step invocation await
    * the same ask instead of opening a second card.
-   * @type {Map<string, Promise<{action: 'continue'|'cancel', outcome: string, code?: string}>>}
+   * @type {Map<string, Promise<{action: 'continue'|'cancel'|'continue-off', outcome: string, code?: string}>>}
    */
   const inflight = new Map()
 
@@ -96,23 +176,26 @@ export function apply(ctx, config) {
    * one entry per agent keeps this bounded. The goal identity is part of the
    * entry so a NEW goal that happens to reach the same round number asks
    * again instead of reusing the old goal's answer.
-   * @type {Map<string, {goalId: string, revision: number, round: number, result: {action: 'continue'|'cancel', outcome: string, code?: string}}>}
+   * @type {Map<string, {goalId: string, revision: number, round: number, result: {action: 'continue'|'cancel'|'continue-off', outcome: string, code?: string}}>}
    */
   const decided = new Map()
 
   /**
-   * Ask one round through the official question card, with our own timeout and
-   * the step's abort signal bridged in. Never rejects: every failure becomes a
-   * `continue` decision.
-   * @returns {Promise<{action: 'continue'|'cancel', outcome: 'answer'|'timeout'|'cancelled'|'error', code?: string}>}
+   * Ask one round through the official question card, with the effective
+   * timeout and the step's abort signal bridged in. Never rejects: every
+   * failure becomes a `continue` decision.
+   * @returns {Promise<{action: 'continue'|'cancel'|'continue-off', outcome: 'answer'|'timeout'|'cancelled'|'error', code?: string}>}
    */
-  async function askRound(questions, agent, goal, round, signal) {
+  async function askRound(questions, agent, goal, round, signal, timeoutSeconds) {
     const controller = new AbortController()
     let timedOut = false
-    const timer = setTimeout(() => {
-      timedOut = true
-      controller.abort()
-    }, cfg.timeoutSeconds * 1000)
+    let timer
+    if (timeoutSeconds > 0) {
+      timer = setTimeout(() => {
+        timedOut = true
+        controller.abort()
+      }, timeoutSeconds * 1000)
+    }
     const abortFromStep = () => controller.abort()
     if (signal !== undefined) {
       if (signal.aborted) controller.abort()
@@ -124,7 +207,7 @@ export function apply(ctx, config) {
           round,
           maxGoalRounds: goal.maxGoalRounds,
           objective: goal.objective,
-          timeoutSeconds: cfg.timeoutSeconds,
+          timeoutSeconds,
         })],
         agent,
         signal: controller.signal,
@@ -142,14 +225,14 @@ export function apply(ctx, config) {
       else if (code === 'ASK_ABORTED') outcome = 'cancelled'
       return { action: decideOutcome({ kind: 'error', code }, cfg), outcome, code }
     } finally {
-      clearTimeout(timer)
+      if (timer !== undefined) clearTimeout(timer)
       if (signal !== undefined) signal.removeEventListener('abort', abortFromStep)
     }
   }
 
   /** Whether an error means the goal ref we hold is no longer the current one. */
   function isStaleRef(error) {
-    return error?.code === 'GOAL_STALE_REVISION' || /stale/i.test(String(error?.message ?? ''))
+    return error?.code === 'GOAL_STALE_REVISION' || /stale/i.test(String(error?.message ?? error))
   }
 
   /**
@@ -195,6 +278,25 @@ export function apply(ctx, config) {
     }
   }
 
+  /**
+   * Record `off` for this session through the command service so the session
+   * log (and any projection) owns it; fall back to memory when the command
+   * cannot run. Never throws.
+   */
+  async function disableSession(agent, signal) {
+    const commands = ctx.get('commands')
+    if (commands !== undefined && typeof commands.execute === 'function') {
+      try {
+        const execution = await commands.execute(agent, `/${COMMAND_NAME} off`, [], signal)
+        if (execution !== undefined) return
+        warn(`/${COMMAND_NAME} off did not resolve; keeping the switch in memory`)
+      } catch (error) {
+        warn(`/${COMMAND_NAME} off failed (${error?.code ?? 'no code'}): ${String(error?.message ?? error)}`)
+      }
+    }
+    sessionState.note(agent?.id, 'off')
+  }
+
   ctx.on('agent/pre-step', async (payload, next) => {
     const messages = Array.isArray(payload?.messages) ? payload.messages : []
     const submitted = messages.find((message) => message?.source?.kind === 'goal' && (message.source.round ?? 0) > 0)
@@ -213,6 +315,23 @@ export function apply(ctx, config) {
     // Subagents cannot ask a human and must never be held or killed by the gate.
     if ((agent.session?.header?.delegationDepth ?? 0) !== 0) return next()
 
+    const override = sessionState.stateFor(agent)
+    const effective = resolveConfig(cfg, override)
+
+    // Per-session `off`: the round proceeds exactly as if the gate were absent.
+    if (effective.enabled === false) {
+      writeStatus({
+        activated: true,
+        pid: process.pid,
+        at: new Date().toISOString(),
+        sessionId: agent.id,
+        round,
+        skipped: 'session-off',
+        sessionState: override ?? null,
+      })
+      return next()
+    }
+
     let goal
     try {
       goal = goals.get(agent)
@@ -225,6 +344,21 @@ export function apply(ctx, config) {
     // paused/disarmed goal and a stale reservation).
     if (goal === undefined || goal.phase !== 'active' || goal.activation !== 'armed') return next()
     if (round !== goal.roundsStarted + 1) return next()
+
+    // A `wait` session must not hold a round nobody can answer: with no page
+    // connected the ask would never settle, so the round proceeds ungated.
+    if (effective.timeoutSeconds === 0 && liveClient() === false) {
+      writeStatus({
+        activated: true,
+        pid: process.pid,
+        at: new Date().toISOString(),
+        sessionId: agent.id,
+        round,
+        skipped: 'no-live-client',
+        sessionState: override ?? null,
+      })
+      return next()
+    }
 
     const key = `${agent.id}:${round}`
     let pending = inflight.get(key)
@@ -239,7 +373,7 @@ export function apply(ctx, config) {
         // decision instead of opening a second card.
         pending = Promise.resolve(remembered.result)
       } else {
-        pending = askRound(questions, agent, goal, round, payload.signal)
+        pending = askRound(questions, agent, goal, round, payload.signal, effective.timeoutSeconds)
         inflight.set(key, pending)
       }
     }
@@ -260,6 +394,13 @@ export function apply(ctx, config) {
       } catch (error) {
         warn(`goal removal failed unexpectedly (${error?.code ?? 'no code'}): ${String(error?.message ?? error)}`)
       }
+    } else if (result.action === 'continue-off') {
+      try {
+        await disableSession(agent, payload.signal)
+      } catch (error) {
+        warn(`session-off write failed unexpectedly (${error?.code ?? 'no code'}): ${String(error?.message ?? error)}`)
+        sessionState.note(agent.id, 'off')
+      }
     }
 
     decided.set(agent.id, { goalId: goal.id, revision: goal.revision, round, result })
@@ -273,6 +414,8 @@ export function apply(ctx, config) {
       outcome: result.outcome,
       ...(result.code === undefined ? {} : { code: result.code }),
       cleared,
+      effective,
+      sessionState: sessionState.stateFor(agent) ?? null,
     })
 
     // On cancel the goal is already gone, so the driver's own fence rejects the

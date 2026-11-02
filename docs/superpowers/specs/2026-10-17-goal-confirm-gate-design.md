@@ -1,6 +1,8 @@
 # goal 续轮确认门设计 · 功能二
 
 > **状态**：设计已获用户裁定（2026-10-17：G-001=A 官方提问卡片 / G-002=A 全局 / G-003=A 关闭=取消删 goal / G-004=A 独立 bundle），本文为**待用户评审的 spec**。
+> **扩展（2026-10-24，D-024）**：会话级开关见 `docs/superpowers/specs/2026-10-24-goal-confirm-session-switch-design.md`；
+> 本文的全局语义、问题文案与降级规则继续有效，`timeoutSeconds` 范围放宽为 `0..3600`（0 = 等待人工）。
 > **关联**：`docs/agents/02-调研-goal续轮确认门.md`；决策记录 `.agents/notes/implemented/2026-10-17-goal-confirm-gate-scope.md`。
 > **用户原话附录**见 §11。**本文不含实现代码**；实现须在 spec 评审通过并出实现计划后进行。
 

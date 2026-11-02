@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Goal Round Confirmation",
-    "description": "Confirm every automatic goal round through the official Web ask card: continue, cancel (and delete the goal), or auto-continue after a configurable timeout. Single Host plugin; reuses the official card with no custom client code."
+    "description": "Confirm every automatic goal round through the official Web ask card: continue, cancel (and delete the goal), or disable the gate for this session; per-session on/off/wait/timeout switches plus a composer-dock control."
   }
 }
