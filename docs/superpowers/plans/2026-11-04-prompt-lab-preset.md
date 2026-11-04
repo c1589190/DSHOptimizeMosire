@@ -81,4 +81,4 @@
 
 - [x] Step 1: 全量测试 `node --test packages/*/test/*.test.mjs`（0 失败）。
 - [x] Step 2: 更新根 `AGENTS.md`（功能九 + D-026..D-029 + 当前门禁）、状态文档、决策记录 `.agents/notes/implemented/2026-11-04-prompt-lab-preset.md`。
-- [x] Step 3: `git status` 自查完成；commit/push 等用户批准（未提交）。
+- [x] Step 3: `git status` 自查完成；已按用户批准 commit + push（`cedf7ae`，2026-11-04）。
