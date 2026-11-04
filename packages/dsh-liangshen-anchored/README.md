@@ -3,12 +3,25 @@
 「梁神模式（锚定式）」的现代复刻：把社区已停用的 **anchored standard** 梁神预设，以官方
 `@deepseek-ai/dsh-agent-preset` 声明机制重新装回 DSH Web profile。
 
-本 bundle 声明**两个预设**：
+本 bundle 声明**三个预设**：
 
 | 预设 id | 名称 | 说明 |
 |---|---|---|
 | `liangshen` | 梁神模式 | 锚定式主预设（order 5） |
 | `liangshen-empty-system` | 梁神模式·空系统提示词 | 与主预设完全一致，仅系统提示词替换为**单个 ASCII 空格**（order 6，对照用） |
+| `minimal-prompt-lab` | 极简模式·提示词实验 | 官方 Minimal 基底 + `/sp` 会话级系统提示词（order 4） |
+
+### 极简模式·提示词实验（prompt-lab）
+
+官方 Minimal 的第三预设（order 4），系统提示词由会话自己决定：
+
+- `/sp file <path>`：**下一次模型请求**读取文件；首个 `system/message` 即快照，之后改文件不影响本会话；
+- `/sp text <一行>`、`/sp blank`（单个空格）、`/sp clear`（回到官方 persona）、`/sp show`（来源/字节/sha256/冻结状态）；
+- 没有全局默认：未 `/sp` 的会话用官方 persona 行；**空会话先 `/sp`** 是标准流程；
+- 中途 `/sp` = **硬替换**：下一次请求把第一条 system 消息换成新文本（`startsRequestSeries` → `replace`），旧提示词从 surface 移除，整段早停缓存失效（用户明确要这个代价）；
+- 文件 UTF-8、去 BOM、拒绝空文件/NUL/超 256 KiB；`/sp` 是 preset-scoped，只在本预设会话可见。
+
+> 工具面：预设自有行 = 官方 Minimal 的 `bash` + `read_image`；Web profile 的宿主插件会给**每个** preset 追加 profile 级工具（实测与官方 minimal 对照完全相同，56 个），read/write/edit 不在其中。
 
 ## 它做什么
 
@@ -52,7 +65,7 @@ node tools/link-dsh-peers.mjs
 node tools/doctor.mjs
 ```
 
-装完新开会话，在预设选择器里选「梁神模式」或「梁神模式·空系统提示词」。
+装完新开会话，在预设选择器里选「梁神模式」「梁神模式·空系统提示词」或「极简模式·提示词实验」。
 
 > 为什么要 symlink：组合 YAML 由 `@deepseek-ai/cordis-plugin-include` 从包内目录加载，
 > 其中的 `@deepseek-ai/*` 裸包名由 Node 从该目录向上找 `node_modules`；workspace 包没有自己的依赖树，
@@ -79,8 +92,13 @@ presets/liangshen/
   custom-bash.mjs                 # Windows Git Bash 等价 bash
   compaction-epoch.mjs            # 晋升纪元（压缩感知）
   session-events.mjs
+presets/minimal-prompt-lab/
+  preset.yml                      # 极简模式·提示词实验元数据（order 4）
+  agent.cordis.yml                # 官方 Minimal rows + 本地 persona/command 两行
+  prompt-lab-persona.mjs          # 动态 persona provider（每会话提示词）
+  prompt-lab-command.mjs          # /sp 命令（file/text/blank/clear/show）
 test/                             # node --test（组合/纪元/verifier/后台任务）
-lib/index.js                      # host 插件：激活时声明两个预设 + 诊断状态文件
+lib/index.js                      # host 插件：激活时声明三个预设 + 诊断状态文件
 ```
 
 ## 验证
@@ -91,6 +109,8 @@ cd packages/dsh-liangshen-anchored && node --test test/*.test.mjs
 node ../../tools/verify-session.mjs <session.v4.jsonl.zstd> --preset liangshen
 # 空系统提示词变体（期望首条 system message 恰好为一个空格）：
 node ../../tools/verify-session.mjs <session.v4.jsonl.zstd> --preset liangshen-empty-system
+# 极简模式·提示词实验（可断言有效 system 与最早的 system 快照）：
+node ../../tools/verify-prompt-lab.mjs <session.v4.jsonl.zstd> --system-file exp-b.md --initial-file exp-a.md
 ```
 
 ## 许可

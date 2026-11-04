@@ -1,0 +1,92 @@
+# Agent-plane composition of the `minimal-prompt-lab` preset.
+#
+# The rows below are copied verbatim from the installed
+# `@deepseek-ai/dsh-web-app/presets/minimal.patch.yml` (`config.plugins` of the
+# `preset-minimal` declaration) so the tool surface and the compaction / shell
+# groups stay identical to the official「极简模式」preset. The only deliberate
+# differences are:
+#
+#   - the `persona` row is replaced by the local `./prompt-lab-persona.mjs`
+#     provider (same `complete: true` + `includeRuntimeContext: false` shape,
+#     but the prompt is resolved per session from the `prompt-lab` projection);
+#   - the `./prompt-lab-command.mjs` row adds the `/sp` command.
+#
+# A bundled preset must not depend on the moving install path of
+# `@deepseek-ai/dsh-web-app`, so the rows are inlined here. When upgrading DSH,
+# run `node tools/check-minimal-drift.mjs --official <new minimal.patch.yml>`
+# and update this file + the composition test together.
+#
+# Tools: `bash` (persistent-bash / persistent-pwsh) + `read_image` only. No
+# read/write/edit tools, no skills, goal, todo, web, delegation or bootstrap
+# rows — exactly the official Minimal surface.
+
+- id: prompt-lab-persona
+  name: ./prompt-lab-persona.mjs
+
+- id: tool-fs
+  name: '@deepseek-ai/dsh-tool-fs'
+  config:
+    read: false
+    readImage: true
+    write: false
+    edit: false
+
+- id: compaction
+  name: cordis:group
+  group: true
+  isolate:
+    compaction: true
+  config:
+    - id: compaction-basic
+      name: '@deepseek-ai/dsh-compaction-basic'
+    - id: command-compact
+      name: '@deepseek-ai/dsh-command-compact'
+
+- id: persistent-shell
+  name: cordis:group
+  group: true
+  isolate:
+    terminals: true
+  config:
+    - id: pty
+      name: '@deepseek-ai/dsh-terminal'
+    - id: terminal-bash
+      name: '@deepseek-ai/dsh-terminal-bash'
+      disabled: !!js process.platform === 'win32'
+      config:
+        timeoutMs: 300000
+    - id: persistent-bash
+      name: '@deepseek-ai/dsh-tool-bash-persistent'
+      disabled: !!js process.platform === 'win32'
+      config:
+        timeoutMs: 300000
+        description: |-
+          Run commands in a bash shell
+          * When invoking this tool, the contents of the "command" parameter does NOT need to be XML-escaped.
+          * Network access depends on the task environment. Prefer configured mirrors/proxies when they are available.
+          * State is persistent across command calls and discussions with the user.
+          * To inspect a particular line range of a file, e.g. lines 10-25, try 'sed -n 10,25p /path/to/the/file'.
+          * Please avoid commands that may produce a very large amount of output.
+          * Please run long lived commands in the background, e.g. 'sleep 10 &' or start a server in the background.
+    - id: terminal-pwsh
+      name: '@deepseek-ai/dsh-terminal-bash'
+      disabled: !!js process.platform !== 'win32'
+      config:
+        shellDialect: pwsh
+        timeoutMs: 300000
+    - id: persistent-pwsh
+      name: '@deepseek-ai/dsh-tool-pwsh-persistent'
+      disabled: !!js process.platform !== 'win32'
+      config:
+        timeoutMs: 300000
+        description: |-
+          Run commands in a PowerShell shell
+          * When invoking this tool, the contents of the "command" parameter does NOT need to be XML-escaped.
+          * You don't have access to the internet via this tool.
+          * State is persistent across command calls and discussions with the user.
+          * Use native Windows paths (C:\...) and $env:NAME variables; this is PowerShell, not bash.
+          * Please avoid commands that may produce a very large amount of output.
+          * Please run long lived commands in the background, e.g. 'Start-Job' or start a server with Start-Process.
+
+- id: prompt-lab-command
+  name: ./prompt-lab-command.mjs

@@ -20,7 +20,7 @@
   本机残留的 `~/.dsh/.agent-presets/liangshen/` 因此不再被任何会话读取；dsh-web 插件版后来又在 v0.3.23 重构为「极简 persona + PTC/both」，锚定被退役。
 - **一手复刻材料**：本机 legacy 目录里的 v7 源码（9 文件 / 1451 行）+ TUI 0.15.0 包内同源副本
   （`@deepseek-harness-tui/dsh-tui/presets/liangshen/`）。现代承载形态必须改成 **bundle patch + `@deepseek-ai/dsh-agent-preset` 声明**。
-- **本项目目标（八个功能）**：
+- **本项目目标（九个功能）**：
   - **功能一 · 梁神模式复刻**：以官方机制把锚定式 v7 重建为可安装的 DSH 插件/preset（Web profile bundle），并做**有对照证据**的优化
     （本轮范围：`promoteOn: either` + `context-gate` + Windows 后台任务；双分支/熔断/事实登记簿留待后续）。
     **版本无关**：预设的官方 peer 在每次 Host 激活时从运行中的 DSH 解析并重建 symlink farm，不持久化 DSH 安装路径（D-022）。
@@ -44,6 +44,9 @@
   - **功能八 · Session 日志导入（`/import <路径>`）**：把 DSH 导出的 ZIP（或裸 `session.v4.jsonl` / 多帧 zstd）
     经官方 `ctx.sessionPersistence.create/append/flush` 写回会话库；整树导入，id 空闲保留、占用改 `session-<uuid>`
     并重映射父链；附件按内容寻址写回；不新增 HTTP 路由、不改客户端。裁定见 D-025。
+  - **功能九 · 极简模式·提示词实验（prompt-lab）**：第三预设 `minimal-prompt-lab`（order 4，官方 Minimal 基底），
+    `/sp file|text|blank|clear|show` 在会话内选择系统提示词；首个 `system/message` 即快照，中途 `/sp` 用 `startsRequestSeries`
+    硬替换第一条 system 消息（旧提示词移除、整段缓存失效）；无全局默认。裁定见 D-026~D-029。
 - **交付形态（2026-10-19，D-020）**：以上功能统一由**单一 bundle `@mosire/dshom`** 提供（Host 入口按特性调用各实现模块；
   Client half = 聊天时间标注）；旧 `@mosire/dsh-*` 包保留为实现/测试模块，profile 只启用 `dshom`。
 - 权威顺序：**用户原话 > 最新落盘文档 > 本文件 > `docs/agents/*.md` 长文 > 上游参考（DSH / TUI / dsh-web 的源码与 README）> 旧文档**。
@@ -105,13 +108,15 @@
 - `docs/superpowers/specs/2026-10-17-chat-timing-annotations-design.md` —— 功能六：Chat 时间标注（官方槽位方案 A/数据来源/已知限制）。
 - `docs/superpowers/specs/2026-10-24-goal-confirm-session-switch-design.md` —— 功能二扩展：会话级开关（命令/卡片第三项/composer dock 开关、projection `goal-confirm`、fail-open）。
 - `docs/superpowers/specs/2026-11-02-session-import-design.md` —— 功能八：Session 导入（输入嗅探/id 策略/cwd/附件/失败语义）。
-- `docs/superpowers/plans/2026-10-17-liangshen-anchored.md`、`…-goal-confirm-gate.md`、`…-subagent-access.md`、`…-empty-system-prompt.md`、`…-compaction-recovery-hint.md`、`…-session-import.md` —— 逐任务实现计划。
+- `docs/superpowers/specs/2026-11-04-prompt-lab-preset-design.md` —— 功能九：极简模式·提示词实验（官方 Minimal 基底、`/sp` 会话级提示词、provider 每 assembly 求值、硬替换、projection 状态、验收表）。
+- `docs/superpowers/plans/2026-10-17-liangshen-anchored.md`、`…-goal-confirm-gate.md`、`…-subagent-access.md`、`…-empty-system-prompt.md`、`…-compaction-recovery-hint.md`、`…-session-import.md`、`docs/superpowers/plans/2026-11-04-prompt-lab-preset.md` —— 逐任务实现计划。
 
 **④ 状态与交接**
 
 - `docs/superpowers/status/2026-10-17-initial-survey.md` —— 本轮调研与实现进度（**下次开工先读它**）。
 - `docs/superpowers/status/2026-10-24-goal-confirm-session-switch.md` —— D-024 会话级开关：改了什么、验证到哪层、重启后的 E2E 清单。
-- `docs/superpowers/status/2026-11-02-session-import.md` —— 功能八：实现、真实后端 E2E 与未验证清单（**最新状态**）。
+- `docs/superpowers/status/2026-11-02-session-import.md` —— 功能八：实现、真实后端 E2E 与未验证清单。
+- `docs/superpowers/status/2026-11-04-prompt-lab.md` —— 功能九：实现、真实 E2E（8/8 checks）、未验证清单与 3080 重启要求（**最新状态**）。
 
 ## 五、交叉纪律要点（每条只是概述 + 指针）
 
@@ -191,6 +196,11 @@ Host 直接读盘；只走官方 `sessionPersistence.create/append/flush/close`�
 整批校验后才写；cwd 保留原值（不存在回退 Agent cwd）；附件内容寻址写回。设计见
 `docs/superpowers/specs/2026-11-02-session-import-design.md`，证据见 `.superpowers/sdd/2026-11-02-session-import/progress.md`。
 
+**提示词实验预设（2026-11-04）**：D-026=第三预设 `minimal-prompt-lab` 承载于 `@mosire/dsh-liangshen-anchored`（不新建包），组合照抄官方 Minimal、persona 行换本地 provider；
+D-027=provider 每次 assembly 求值（`complete:true` + `suppressRuntimeContext` + `interpolate:false`），中途切换用 `startsRequestSeries` 硬替换（用户选 B）；
+D-028=会话选择/冻结/切换只从 `prompt-lab` projection 折叠（无旁路文件、无全局默认）；D-029=`/sp` preset-scoped、文件下一次请求读取、空文件拒绝、256 KiB 上限。
+实机 E2E：`session-6eaacc2c…`，8/8 checks；官方 minimal 对照工具目录/`runtime-context` 基线一致；251/251 单测。证据 `.superpowers/sdd/2026-11-04-prompt-lab/evidence/`。
+
 **当前门禁（必须遵守）**：
 1. 功能一/二 spec 与计划已获用户批准并已提交；功能三/四 设计已定（用户 2026-10-17「出设计，提交并推送，然后开始实现」授权直接实现）。
 2. 进度（2026-10-17 深夜）：功能一 **M0/T1/T2/T3/T4/T5 完成**（未验：Windows 实机、子代理锚定 E1、resume F1）；
@@ -223,6 +233,11 @@ Host 直接读盘；只走官方 `sessionPersistence.create/append/flush/close`�
    2026-11-02（D-025）：Session 导入实现完成：单测 28/28、全工作区 214/214；真实 jsonl 后端 E2E 通过
    （导入两次、id 冲突改 `session-<uuid>`、`list/open` 读回 2003 事件、落盘 `type/seq` 序列一致、坏行拒绝且不留半成品）；
    Web `/import` 真机待 3080 Host 重启后验。
+   2026-11-04（D-026~D-029）：功能九 prompt-lab 实现完成：第三预设 `minimal-prompt-lab`、`/sp` 命令、动态 persona provider、
+   `prompt-lab` projection + `agent/pre-step` 硬替换守卫；单测 251/251；临时 3099 Host 真实 E2E 8/8 checks
+   （空白会话 `/sp A` → 首条 system==A；中途 `/sp B` → `surfaceOp replace`、单节点；官方 minimal 对照工具/注入一致）；
+   证据 `.superpowers/sdd/2026-11-04-prompt-lab/evidence/`；**待用户重启 3080 Host** 后选「极简模式·提示词实验」验收；
+   `/sp clear|text|blank`、冻结、fork/resume 仅单测。
    功能五（2026-10-17）：**已实现并实机通过**（`instruction-hint` epoch 感知 recovery + `context-gate.allowKinds`；单测 liangshen 76/76）；用户重启后会话 `session-aa65c681…`：压缩@104 → recovery-hint@111 → 首请求 tools=2 → 模型重读 AGENTS.md@116，verifier exit=0。证据本机 `.superpowers/sdd/2026-10-17-compaction-recovery-hint/`；空预设未单独跑 recovery。
 3. 任何新增「待裁定」先做口径溯源并落盘，已有裁定不重复问（见 `docs/AGENTS.md` §二）。
 4. 用户 2026-10-17 已授权本阶段 `git commit` + push 到 `git@github.com:c1589190/DSHOptimizeMosire.git`（main）。

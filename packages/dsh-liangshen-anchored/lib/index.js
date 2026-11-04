@@ -12,13 +12,23 @@
  * sets its own baseUrl to the composition's directory, so the relative
  * `./*.mjs` plugin names inside `agent.cordis.yml` resolve inside the package.
  *
- * This bundle declares TWO presets from the same preset directory:
+ * This bundle declares THREE presets:
  *
  *   - `liangshen` — the anchored LiangShen preset (order 5);
  *   - `liangshen-empty-system` — the same composition with the persona prefix
  *     replaced by a single ASCII space (order 6), for system-prompt-free
  *     comparison runs. Its composition is generated from the main one by
- *     `tools/sync-preset-variant.mjs`; the test suite fails when it is stale.
+ *     `tools/sync-preset-variant.mjs`; the test suite fails when it is stale;
+ *   - `minimal-prompt-lab` — the official「极简模式」(Minimal) composition with
+ *     a per-session, file-backed system prompt and the `/sp` command (order 4).
+ *     Its rows live in `presets/minimal-prompt-lab/`; see the spec
+ *     `docs/superpowers/specs/2026-11-04-prompt-lab-preset-design.md`.
+ *
+ * For `minimal-prompt-lab` the Host half also installs the `prompt-lab` session
+ * projection (the only sanctioned synchronous per-session read) and an
+ * `agent/pre-step` guard that turns a pending `/sp` switch into a fresh
+ * model-message series, so the switch replaces the head system message instead
+ * of appending a second one.
  *
  * Declare = enabled: the registry mounts each preset's rows eagerly and returns
  * a disposer this plugin owns through `ctx.effect`, so unloading the row
@@ -28,6 +38,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { syncPackagePeerFarm } from './host-peers.js'
+import { PROMPT_LAB_KEY, makePromptLabProjection, makeSwitchGuard } from './prompt-lab-state.js'
 
 /** Stable cordis plugin name (loader diagnostics). */
 export const name = 'liangshen-anchored'
@@ -35,10 +46,14 @@ export const name = 'liangshen-anchored'
 /** The bundled preset directory, resolved from this module rather than the profile. */
 const PRESET_ROOT = new URL('../presets/liangshen/', import.meta.url)
 
+/** The prompt-lab preset directory. */
+const PROMPT_LAB_ROOT = new URL('../presets/minimal-prompt-lab/', import.meta.url)
+
 /**
  * One declaration per bundled preset. `composition` and `metadata` are relative
- * to {@link PRESET_ROOT}; `fallback` metadata is used if the YAML file is
- * missing (it is part of the package, so this is diagnostic robustness only).
+ * to the spec's `root` (defaults to {@link PRESET_ROOT}); `fallback` metadata is
+ * used if the YAML file is missing (it is part of the package, so this is
+ * diagnostic robustness only).
  */
 const PRESETS = [
   {
@@ -61,12 +76,23 @@ const PRESETS = [
       order: 6,
     },
   },
+  {
+    id: 'minimal-prompt-lab',
+    root: PROMPT_LAB_ROOT,
+    metadata: 'preset.yml',
+    composition: 'agent.cordis.yml',
+    fallback: {
+      name: '极简模式·提示词实验',
+      description: '官方极简模式的系统提示词实验版：用 /sp 在会话内选择提示词文件或内联文本，下一次请求生效并替换整段系统提示词，其余与官方极简模式一致。',
+      order: 4,
+    },
+  },
 ]
 
 /** Minimal preset.yml reader: `name`, `description`, `order` are plain scalars. */
 async function readMetadata(spec) {
   try {
-    const text = await readFile(new URL(spec.metadata, PRESET_ROOT), 'utf8')
+    const text = await readFile(new URL(spec.metadata, spec.root ?? PRESET_ROOT), 'utf8')
     const metadata = { ...spec.fallback }
     for (const line of text.split('\n')) {
       const match = /^(name|description|order):\s*(.+)$/u.exec(line.trim())
@@ -97,7 +123,7 @@ async function writeStatus(entry) {
  * @returns {Promise<{id: string, declared: boolean, composition: string, broken?: string|null, error?: string}>}
  */
 async function declareOne(ctx, registry, spec) {
-  const composition = new URL(spec.composition, PRESET_ROOT).href
+  const composition = new URL(spec.composition, spec.root ?? PRESET_ROOT).href
   try {
     const metadata = await readMetadata(spec)
     const dispose = await registry.register({
@@ -190,7 +216,43 @@ export async function declarePresets(ctx, options = {}) {
   })
 }
 
+/**
+ * Install the prompt-lab Host half: the `prompt-lab` session projection and the
+ * `agent/pre-step` hard-switch guard.
+ *
+ * The projection is the sanctioned synchronous per-session read (the event-log
+ * getters are deprecated for new calls); the preset's persona provider calls
+ * `stateOf()` on every assembly. The guard upgrades a pending `/sp` switch into
+ * a fresh model-message series, so `SystemPromptProjection` replaces the head
+ * system message (a true switch) instead of appending a second one (the native
+ * "in-history" behavior).
+ */
+function installPromptLab(ctx) {
+  const definition = makePromptLabProjection()
+  const install = (serviceCtx) => {
+    try {
+      const registry = serviceCtx?.get?.('sessionProjections')
+      if (registry !== undefined && typeof registry.register === 'function') registry.register(definition)
+    } catch (error) {
+      ctx.logger?.warn?.(
+        'liangshen-anchored: prompt-lab projection registration failed: %s',
+        String(error?.message ?? error),
+      )
+    }
+  }
+  if (ctx.get('sessionProjections') !== undefined) install(ctx)
+  else if (typeof ctx.inject === 'function') ctx.inject(['sessionProjections'], (ready) => install(ready ?? ctx))
+
+  const guard = makeSwitchGuard((agent) => {
+    const registry = ctx.get('sessionProjections')
+    if (registry === undefined || agent?.session === undefined) return undefined
+    return registry.stateOf(agent.session, PROMPT_LAB_KEY)
+  })
+  if (typeof ctx.on === 'function') ctx.on('agent/pre-step', guard, { prepend: true })
+}
+
 export function apply(ctx) {
+  installPromptLab(ctx)
   if (ctx.get('agentPresets') !== undefined) {
     void declarePresets(ctx)
     return

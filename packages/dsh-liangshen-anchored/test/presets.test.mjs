@@ -51,17 +51,20 @@ async function declare(registry) {
   }
 }
 
-test('declares both bundled presets with metadata and absolute composition URLs', async () => {
+test('declares all three bundled presets with metadata and absolute composition URLs', async () => {
   const registry = makeRegistry()
   const status = await declare(registry)
-  assert.equal(registry.calls.length, 2)
-  const [main, empty] = registry.calls
+  assert.equal(registry.calls.length, 3)
+  const [main, empty, lab] = registry.calls
   assert.equal(main.id, 'liangshen')
   assert.equal(main.name, '梁神模式')
   assert.equal(main.order, 5)
   assert.equal(empty.id, 'liangshen-empty-system')
   assert.equal(empty.name, '梁神模式·空系统提示词')
   assert.equal(empty.order, 6)
+  assert.equal(lab.id, 'minimal-prompt-lab')
+  assert.equal(lab.name, '极简模式·提示词实验')
+  assert.equal(lab.order, 4)
   for (const definition of registry.calls) {
     assert.equal(definition.plugins.length, 1)
     assert.equal(definition.plugins[0].name, '@deepseek-ai/cordis-plugin-include')
@@ -71,9 +74,10 @@ test('declares both bundled presets with metadata and absolute composition URLs'
   }
   assert.match(main.plugins[0].config.path, /agent\.cordis\.yml$/u)
   assert.match(empty.plugins[0].config.path, /agent\.empty-system\.cordis\.yml$/u)
+  assert.match(lab.plugins[0].config.path, /minimal-prompt-lab\/agent\.cordis\.yml$/u)
   assert.equal(status.declared, true)
-  assert.equal(status.presets.length, 2)
-  assert.deepEqual(status.presets.map((preset) => preset.broken), [null, null])
+  assert.equal(status.presets.length, 3)
+  assert.deepEqual(status.presets.map((preset) => preset.broken), [null, null, null])
   assert.equal(status.peers.synced, true)
   assert.equal(status.peers.anchor, '/fake/dsh/lib/bin.js')
   // Backward-compatible single-preset projection.
@@ -87,16 +91,18 @@ test('a broken activation is reported per preset without failing the roster writ
   assert.equal(status.declared, true)
   assert.equal(status.presets[0].broken, null)
   assert.equal(status.presets[1].broken, 'row never started')
+  assert.equal(status.presets[2].broken, null)
   assert.equal(status.broken, null)
 })
 
 test('one failed declaration does not block the other and is recorded', async () => {
   const registry = makeRegistry({ fail: new Set(['liangshen-empty-system']) })
   const status = await declare(registry)
-  assert.equal(registry.calls.length, 1)
+  assert.equal(registry.calls.length, 2)
   assert.equal(status.declared, false)
   assert.equal(status.presets[0].declared, true)
   assert.equal(status.presets[1].declared, false)
+  assert.equal(status.presets[2].declared, true)
   assert.match(status.presets[1].error, /boom:liangshen-empty-system/u)
 })
 
