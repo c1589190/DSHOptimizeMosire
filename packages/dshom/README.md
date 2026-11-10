@@ -1,6 +1,13 @@
 # @mosire/dshom
 
-DSH Optimize Mosire 的**唯一入口 bundle**：把梁神预设、goal 确认、子 Agent 控制、后台任务工具和聊天时间标注收进一个插件行。
+DSH Optimize Mosire 的**唯一入口 bundle**：把梁神预设、goal 确认、子 Agent 控制、后台任务工具、Session 导入和 prompt-lab 编排收进一个插件行。
+
+> **2026-11-10：本 bundle 只保留 Host half，客户端 half（聊天时间标注 + composer dock 的 goal 开关）已移除。**
+> DSH 0.2.2 的 composerSeat 带 `will-change:transform`，是 `position:fixed` 后代的包含块；
+> 旧 client half 把 fixed 标签/菜单渲染在 `conversation.composer.dock` 里，坐标被容器劫持，
+> 会出现时间标签飘到输入框/屏外、goal 菜单错位等显示问题。详见
+> `.agents/notes/implemented/2026-11-10-remove-chat-timing-client.md`。
+> `/goal-confirm` 命令与提问卡片第三项仍由 Host half 提供，只是不再有 composer dock 小开关。
 
 | 功能 | 实现 | 默认 |
 |---|---|---|
@@ -8,9 +15,9 @@ DSH Optimize Mosire 的**唯一入口 bundle**：把梁神预设、goal 确认�
 | goal 续轮确认门 | `../dsh-goal-confirm/lib/index.js` | 开 |
 | 父→子 Agent 控制工具（`subagent_list/message/interrupt/wait`） | `../dsh-subagent-access/lib/index.js` | 开 |
 | 后台任务 `job_wait` / `job_read`（等待与优化输出分离） | `../dsh-job-tools/lib/index.js` | 开 |
-| 聊天时间标注（运行中实时 + 完成后） | `./client.js` | 开 |
 | Session 日志导入（`/import <路径>`） | `../dsh-session-import/lib/index.js` | 开 |
-| 会话级 goal 确认开关（composer dock） | `./client.js` + `../dsh-goal-confirm` 的 `/goal-confirm` 命令、投影 | 开 |
+| Prompt-lab 会话编排（`prompt_lab_workspaces` / `prompt_lab_session`） | `../dsh-prompt-lab-session/lib/index.js` | 开 |
+| 会话查看（`session_list` / `session_read` / `session_find`） | `../dsh-session-inspect/lib/index.js` | 开 |
 
 Host 入口按需调用各功能的既有 `apply`，不复制业务代码；预设组合仍位于
 `packages/dsh-liangshen-anchored/presets/liangshen/`（由该包自己的 peer symlink 农场解析 `@deepseek-ai/*`）。
@@ -50,7 +57,7 @@ Host 入口按需调用各功能的既有 `apply`，不复制业务代码；预�
 缺少服务时对应功能自动跳过（fail-open）。
 
 `goalConfirm.timeoutSeconds: 0` = 会话等待人工确认（不自动继续）。会话级开关不写配置，而是用
-`/goal-confirm on|off|wait|timeout <秒>|reset`、卡片第三项或 composer dock 的「续轮确认」小按钮；
-状态由会话日志里的 `command/run` 经 projection `goal-confirm` 重建（详见 `../dsh-goal-confirm/README.md`）。
+`/goal-confirm on|off|wait|timeout <秒>|reset` 或提问卡片第三项；状态由会话日志里的
+`command/run` 经 projection `goal-confirm` 重建（详见 `../dsh-goal-confirm/README.md`）。
 
 > 本包通过相对路径引用同仓库的功能包，因此适用于 workspace 的 link 安装；发布/打包时需把实现收进本包。

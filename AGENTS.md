@@ -20,7 +20,7 @@
   本机残留的 `~/.dsh/.agent-presets/liangshen/` 因此不再被任何会话读取；dsh-web 插件版后来又在 v0.3.23 重构为「极简 persona + PTC/both」，锚定被退役。
 - **一手复刻材料**：本机 legacy 目录里的 v7 源码（9 文件 / 1451 行）+ TUI 0.15.0 包内同源副本
   （`@deepseek-harness-tui/dsh-tui/presets/liangshen/`）。现代承载形态必须改成 **bundle patch + `@deepseek-ai/dsh-agent-preset` 声明**。
-- **本项目目标（九个功能）**：
+- **本项目目标（十一个功能）**：
   - **功能一 · 梁神模式复刻**：以官方机制把锚定式 v7 重建为可安装的 DSH 插件/preset（Web profile bundle），并做**有对照证据**的优化
     （本轮范围：`promoteOn: either` + `context-gate` + Windows 后台任务；双分支/熔断/事实登记簿留待后续）。
     **版本无关**：预设的官方 peer 在每次 Host 激活时从运行中的 DSH 解析并重建 symlink farm，不持久化 DSH 安装路径（D-022）。
@@ -35,9 +35,10 @@
   - **功能四 · 空系统提示词预设**：新增第二预设 `liangshen-empty-system`——梁神模式但系统提示词替换为单个 ASCII 空格，其余完全一致。
   - **功能五 · 压缩后恢复 hint**：`compaction/end` 后额外注入一条恢复 hint（提醒重读 AGENTS.md/CLAUDE.md、定位仓库根、恢复 status/handoff、
     用 `skill_search`/`skill_load` 恢复技能环境）；纯提示、不注入文件内容、不回挂官方注入源。裁定见 D-011~D-014。
-  - **功能六 · Chat 时间标注（Web UI 插件）**：只用 Chat 官方 additive slots
+  - **功能六 · Chat 时间标注（Web UI 插件；2026-11-10 已移除客户端 half，见 D-033）**：原方案用 Chat 官方 additive slots
     （`conversation.chat.assistant-actions` + `conversation.chat.turnTail`）显示每条 assistant 消息的开始时间/耗时，
-    以及每轮思考/工具命令的开始时间与耗时；运行中由 LiveTiming overlay 实时显示。不替换渲染器、不写宿主 DOM。裁定见 D-017/D-018/D-019。
+    以及每轮思考/工具命令的开始时间与耗时；运行中由 LiveTiming overlay 实时显示。0.2.2 的 composerSeat 是
+    fixed 包含块，旧实现未 portal，显示问题由用户裁定直接删除；`@mosire/dshom` 现为 Host-only。裁定见 D-017/D-018/D-019/D-033。
   - **功能七 · 后台任务等待与输出优化**：`job_wait` 阻塞到 job 结束、只返回状态；`job_read` 在绝对偏移读取输出并做
     确定性字符优化（ANSI/CR 清理、重复行合并、head/tail/errors/summary），不消费 `job_output` 游标。创建仍由
     `bash run_in_background` 等生产者负责；首轮锚定不变。裁定见 D-023。
@@ -47,8 +48,20 @@
   - **功能九 · 极简模式·提示词实验（prompt-lab）**：第三预设 `minimal-prompt-lab`（order 4，官方 Minimal 基底），
     `/sp file|text|blank|clear|show` 在会话内选择系统提示词；首个 `system/message` 即快照，中途 `/sp` 用 `startsRequestSeries`
     硬替换第一条 system 消息（旧提示词移除、整段缓存失效）；无全局默认。裁定见 D-026~D-029。
+  - **功能十 · Prompt-lab 会话编排工具（`prompt_lab_workspaces` + `prompt_lab_session`）**：agent 可调用；先
+    `prompt_lab_workspaces` 列出已配置工作区，再在**指定工作区**用 `minimal-prompt-lab` 新建**同级**会话
+    （官方 `sessionController.create({workspaceId,…})`，自动 attach 工作区；不接受 `cwd`/`preset`），
+    可选 `prompt {file|text|blank|default}` 走 `/sp`、可选 `model {provider,model,reasoning_effort?}`
+    （校验目录后 append `model/selection`，不改部署默认）、可选 `task` 等待到 idle 返回最后一条 assistant 文本；
+    只装顶层 Agent scope，跳过子 Agent。新包 `@mosire/dsh-prompt-lab-session`，由 `@mosire/dshom` 的
+    `features.promptLabSession` 启用。裁定见 D-030。
+  - **功能十一 · 会话查看（`session_list` / `session_read` / `session_find`）**：agent 可调用的只读工具，只装顶层 scope
+    （跳过子 Agent）。`session_list` 按工作区/预设/子 Agent/存活过滤并尽取标题；`session_read` 支持 `surface`（当前模型
+    上下文，默认隐藏 reasoning）、`raw`（完整日志）、`event`（`seq` ± 窗口）三种模式，统一 `limit`/`max_chars`/`tail` 截断；
+    `session_find` 在单会话内做字面扫描（含 system/developer 消息；Web profile 的 FTS 默认关闭）。新包
+    `@mosire/dsh-session-inspect`，由 `@mosire/dshom` 的 `features.sessionInspect` 启用。裁定见 D-031。
 - **交付形态（2026-10-19，D-020）**：以上功能统一由**单一 bundle `@mosire/dshom`** 提供（Host 入口按特性调用各实现模块；
-  Client half = 聊天时间标注）；旧 `@mosire/dsh-*` 包保留为实现/测试模块，profile 只启用 `dshom`。
+  **2026-11-10 D-033 起为 Host-only**，client half 已删除）；旧 `@mosire/dsh-*` 包保留为实现/测试模块，profile 只启用 `dshom`。
 - 权威顺序：**用户原话 > 最新落盘文档 > 本文件 > `docs/agents/*.md` 长文 > 上游参考（DSH / TUI / dsh-web 的源码与 README）> 旧文档**。
 - 「当前状态」不抄在本文件：看 `docs/superpowers/status/` 最新一份 + `git log --oneline`。
 
@@ -116,7 +129,11 @@
 - `docs/superpowers/status/2026-10-17-initial-survey.md` —— 本轮调研与实现进度（**下次开工先读它**）。
 - `docs/superpowers/status/2026-10-24-goal-confirm-session-switch.md` —— D-024 会话级开关：改了什么、验证到哪层、重启后的 E2E 清单。
 - `docs/superpowers/status/2026-11-02-session-import.md` —— 功能八：实现、真实后端 E2E 与未验证清单。
-- `docs/superpowers/status/2026-11-04-prompt-lab.md` —— 功能九：实现、真实 E2E（8/8 checks）、未验证清单与 3080 重启要求（**最新状态**）。
+- `docs/superpowers/status/2026-11-04-prompt-lab.md` —— 功能九：实现、真实 E2E（8/8 checks）、未验证清单与 3080 重启要求。
+- `docs/superpowers/status/2026-11-04-prompt-lab-session.md` —— 功能十：`prompt_lab_workspaces` + `prompt_lab_session` 两工具、工作区必填、model 事件、单测 12/12、实机 spawn-only 12/12、待重启 3080。
+- `docs/superpowers/status/2026-11-04-session-inspect.md` —— 功能十一：`session_list` / `session_read` / `session_find` 只读工具、surface/raw/event 三模式、单测 14/14、实机 18/18、待重启 3080。
+- `docs/superpowers/status/2026-11-05-dsh-0.2.2-upgrade.md` —— 2026-11-05 DSH 0.2.2 适配：子路径守卫、`tools.restrict`/`suppressRuntimeContext` 路径、dshom 通用工具组门、实机 12/12。
+- `docs/superpowers/status/2026-11-10-remove-chat-timing-client.md` —— 2026-11-10 移除 dshom 客户端 half（时间标注 + dock goal 开关）、Host-only 安装、liangshen 3099 E2E 12/12（**最新状态**）。
 
 ## 五、交叉纪律要点（每条只是概述 + 指针）
 
@@ -129,10 +146,10 @@
 5. **安全**：不把密钥写进仓库 / 文档；不执行破坏性 git 操作；安装 bundle 会在 Host 进程执行插件代码，只信本仓自产或已审阅的上游包。
 6. **语言**：与用户交流用中文；代码、标识符、提交信息用英文（与上游一致）；文档中文。
 
-## 六、环境事实（本机，2026-10-23）
+## 六、环境事实（本机，2026-11-05）
 
-- DSH 本体：`0.2.1-rc.2`，pnpm global 安装；当前入口
-  `/home/cna/.local/share/pnpm/global/v11/499c6f07…/node_modules/@deepseek-ai/dsh/lib/bin.js`（该路径是符号链接，内容寻址实目录为 `v11/4bb-18e127…`）。
+- DSH 本体：`0.2.2-rc.1`，pnpm global 安装；当前入口
+  `/home/cna/.local/share/pnpm/global/v11/499c6f07…/node_modules/@deepseek-ai/dsh/lib/bin.js`（该路径是符号链接，内容寻址实目录为 `v11/91e-18e52c…`）。
   **安装目录随升级变化**，任何插件都不得持久化其绝对路径；官方 peer 由 `packages/dsh-liangshen-anchored/lib/host-peers.js` 在运行时解析。
 - 当前 profile：`web`；GUI：http://127.0.0.1:3080。
 - 本机 legacy 快照：`~/.dsh/.agent-presets/liangshen/`（9 文件 / 1451 行；**已不被任何会话读取**，只作移植素材）。
@@ -167,8 +184,9 @@ D-008=生成器（`tools/sync-preset-variant.mjs`）+ 提交产物、单测防�
 不替换 Chat 渲染器、不写 DOM；D-018=保留 DSH 自带 Trajectory 视图作为现成能力，不二次开发；
 D-019=运行中实时计时用 LiveTiming overlay（composer.dock；只读行 DOM 对齐，不改宿主 DOM）。
 
-**统一交付（2026-10-19）**：D-020=原六个功能收进单一 bundle `@mosire/dshom`（Host 入口组合各实现模块 + Client half 时间标注；2026-10-23 D-023 增加第七个），
+**统一交付（2026-10-19）**：D-020=原六个功能收进单一 bundle `@mosire/dshom`（Host 入口组合各实现模块；2026-10-23 D-023 增加第七个），
 profile 只启用 dshom；`config.features` 可逐项关闭；旧包只作 workspace 内部实现/测试。
+**2026-11-10 D-033 起 `@mosire/dshom` 为 Host-only，client half 已删除**。
 
 **子 Agent 等待工具（2026-10-19）**：D-021=新增 `subagent_wait`：校验直接子会话后 `await child.whenIdle()`（可选 `timeout_seconds`，
 超时返回 `status:"timeout"`），随后从 live session / sessionQuery 读取该子会话事件，返回最后一条非空 assistant 消息；
@@ -187,7 +205,7 @@ farm 链接与上次 preset 状态；`@mosire/dshom` 导出 `./package.json`。�
 **goal 确认门会话级开关（2026-10-24）**：D-024（用户「开始吧，选 C」）=会话级覆盖 + Web UI 小开关。
 `/goal-confirm on|off|wait|timeout <0..3600>|reset` 为唯一写路径（官方 commands 追加 `command/run`），
 Host 注册 `sessionProjections` 单元 `goal-confirm`（`stateVersion:1`）折叠并从日志重建，`wire.view` 给客户端；
-卡片第三项与 composer dock 开关都走同一命令；`wait`（0 秒）弹卡前用 `typertGateway.hasLiveClient()` 兜底；
+卡片第三项（composer dock 开关已随 D-033 移除）都走同一命令；`wait`（0 秒）弹卡前用 `typertGateway.hasLiveClient()` 兜底；
 全局 `enabled:false` 仍是硬关。设计见 `docs/superpowers/specs/2026-10-24-goal-confirm-session-switch-design.md`，
 证据见 `.agents/notes/implemented/2026-10-24-goal-confirm-session-switch.md`。
 
@@ -201,6 +219,42 @@ D-027=provider 每次 assembly 求值（`complete:true` + `suppressRuntimeContex
 D-028=会话选择/冻结/切换只从 `prompt-lab` projection 折叠（无旁路文件、无全局默认）；D-029=`/sp` preset-scoped、文件下一次请求读取、空文件拒绝、256 KiB 上限。
 实机 E2E：`session-6eaacc2c…`，8/8 checks；官方 minimal 对照工具目录/`runtime-context` 基线一致；251/251 单测。证据 `.superpowers/sdd/2026-11-04-prompt-lab/evidence/`。
 
+**Prompt-lab 会话编排工具（2026-11-04，D-030 修订）**：两个 agent 工具 `prompt_lab_workspaces` / `prompt_lab_session`（新包 `@mosire/dsh-prompt-lab-session`，dshom `features.promptLabSession` 默认开），
+不另做 CLI/headless profile；`workspace` 必填（id/title/path，未知则列出可用），用官方 `sessionController.create({workspaceId, agentPreset:'minimal-prompt-lab'})` 建顶层会话并自动 attach，
+拒绝 `cwd`/`preset`（修掉旧版传 cwd 创建 → 未 attach → 侧栏未分组）；`/sp` 选提示词（文件创建前校验、下一次请求读取），
+`model` 先查 `modelCatalog` 再 append `model/selection`（不调 `selectModel`，避免改部署默认）；`controller.prompt` + `agent.whenIdle()` 取最后一条 assistant 文本；
+只装顶层 Agent scope（跳过子 Agent）；`commands.execute` 必须传 signal，工具缺省回退 `new AbortController().signal`。
+实机 spawn-only `session-af61d088…`（工作区 `96201178…`）：12/12 checks（工作区列表、attach、preset、projection selection、dshom 已装工具）；单测 12/12；task/超时仅单测。证据 `.superpowers/sdd/2026-11-04-prompt-lab-session/evidence/live-spawn.json`。
+
+**会话查看工具（2026-11-04，D-031）**：新包 `@mosire/dsh-session-inspect`，dshom `features.sessionInspect` 默认开；三个只读工具
+`session_list`（工作区/预设/子 Agent/存活过滤 + 标题）、`session_read`（`surface` 当前模型上下文 / `raw` 完整日志 / `event` seq 窗口；
+`limit`/`max_chars`/`tail` 截断）、`session_find`（单会话字面扫描）。只装顶层 Agent scope，跳过子 Agent；不写、不删、不建会话。
+`session_find` 不用官方 `filterEvents`，因为 `extractSessionEventText()` 跳过 `system/message`（搜不到系统提示词），改为读 `readSession` 后本地扫描；
+跨会话 FTS 不做（web profile `session-query-sqlite` `openAt: never`）。单测 14/14；临时 3099 Host 实机 18/18
+（`session-0e6d893b…`，工作区 `a6ae1ad0…`，surface 4 事件、raw request/turn-end、find seq 9）；证据
+`.superpowers/sdd/2026-11-04-session-inspect/evidence/live-session-inspect.json`。
+
+**DSH 0.2.2 适配（2026-11-05，D-032）**：`tool-subagent-list-agents` 行改为 `disabled: !!js`
+条件守卫（0.2.2 删除子路径、主插件已自带 `list_agents`）；bootstrap 改用
+`agent.ctx.tools.restrict`，context-gate 改用 `suppressRuntimeContext()` + 空 shadow
+`working-directory:current`；新增 `packages/dshom/tool-gate.js`，锚定预设的 dshom 工具组
+在首次晋升前不挂载、晋升后挂载、压缩后卸载（非锚定/子 Agent/已晋升会话立即挂载）。
+单测 120/53/18/32/28/12/14/5 全绿；3099 实机 `liangshen` 与 `liangshen-empty-system`
+各全绿（首请求双工具、无注入上下文、晋升 86 工具）。证据
+`.superpowers/sdd/2026-11-05-dsh-0.2.2/evidence/`；**待用户重启 3080**；standard /
+minimal-prompt-lab 实机与压缩重锚未验。
+
+**移除 Chat 时间标注客户端 half（2026-11-10，D-033）**：用户裁定「直接把工具调用时间显示给删掉，赶紧改一个没有 bug 的版本，我要用梁神模式」。
+删除 `packages/dshom/client.js` 与 `dsh.client` 清单：`@mosire/dshom` 现为 **Host-only**，不再注册
+`conversation.chat.assistant-actions` / `conversation.chat.turnTail` / `conversation.composer.dock` 的任何条目；
+`/goal-confirm` 命令、会话投影与提问卡片第三项保留（composer dock 小开关随 client half 移除）。
+根因：0.2.2 的 `.wSkVaW_composerSeat` 带 `will-change:transform`，是 fixed 后代的包含块，官方契约要求
+composer 槽的 fixed 浮层必须 portal 到 body；旧 `LiveTiming`/goal 菜单未 portal，坐标被容器劫持。另：`LiveTiming`
+读取 `[data-chat-flow]`/`[data-chat-node-key]` 属宿主内部 DOM（无公开契约）。证据与复现见
+`.agents/notes/implemented/2026-11-10-remove-chat-timing-client.md`；实机 3080 已启用 Host-only bundle，
+3099 真实 E2E `liangshen` 12/12（首请求双工具、零注入、晋升 80 工具），证据
+`.superpowers/sdd/2026-11-10-remove-timing-ui/evidence/verify-presets.json`。
+
 **当前门禁（必须遵守）**：
 1. 功能一/二 spec 与计划已获用户批准并已提交；功能三/四 设计已定（用户 2026-10-17「出设计，提交并推送，然后开始实现」授权直接实现）。
 2. 进度（2026-10-17 深夜）：功能一 **M0/T1/T2/T3/T4/T5 完成**（未验：Windows 实机、子代理锚定 E1、resume F1）；
@@ -213,6 +267,7 @@ D-028=会话选择/冻结/切换只从 `prompt-lab` projection 折叠（无旁�
    重挂载后 `broken:null`；真实「新会话按次换模型/档位」wire 待新会话验证（旧会话不追溯）。
    功能六（2026-10-17）：三个 Chat 槽 occupants `active:true`；LiveTiming overlay（运行中实时 `开始 HH:MM · 已用 …`，D-019）；
    **用户已确认**：真实工具运行（`sleep 5`，22:21:30–35）期间命令右侧出现实时计时标签。
+   **2026-11-10（D-033）已整体移除该 client half**（0.2.2 composer fixed 包含块导致坐标错位）；`@mosire/dshom` 现为 Host-only。
    2026-10-19：DSH 升级 0.2.1-rc.2 后修复 peer relink（`9daa47e`），并将六个功能统一安装为 `@mosire/dshom`（D-020）；
    两预设 `broken:null`、goal-confirm/subagent-access 均 activated；待用户新会话验收四功能同启。
    2026-10-19：`subagent-access` 新增 `subagent_wait`（D-021）；单测 32/32；等待 DSH 重启后对新会话生效。
@@ -238,6 +293,15 @@ D-028=会话选择/冻结/切换只从 `prompt-lab` projection 折叠（无旁�
    （空白会话 `/sp A` → 首条 system==A；中途 `/sp B` → `surfaceOp replace`、单节点；官方 minimal 对照工具/注入一致）；
    证据 `.superpowers/sdd/2026-11-04-prompt-lab/evidence/`；**待用户重启 3080 Host** 后选「极简模式·提示词实验」验收；
    `/sp clear|text|blank`、冻结、fork/resume 仅单测。
+   2026-11-04（D-030 修订）：功能十改为两个工具（`prompt_lab_workspaces` + `prompt_lab_session`）：`workspace` 必填、拒绝 `cwd`/`preset`、
+   可配 `model`（`model/selection`，不改部署默认）、修复旧版 cwd 创建导致会话进「未分组」；单测 12/12；
+   临时 3099 Host 实机 spawn-only 12/12（工作区列表 + attach + preset + projection selection）；
+   证据 `.superpowers/sdd/2026-11-04-prompt-lab-session/evidence/live-spawn.json`；**待用户重启 3080 Host** 后新版才对顶层 Agent 可见；
+   task/超时、`/sp clear|text|blank` 真机未跑；旧未分组会话不迁移（用户 m01163）。
+   2026-11-04（D-031）：功能十一 session-inspect 实现完成：`session_list` / `session_read`（surface/raw/event）/ `session_find`；
+   单测 14/14；临时 3099 Host 实机 18/18（`session-0e6d893b…`，工作区 `a6ae1ad0…`，surface 4 事件、raw request/turn-end、find seq 9）；
+   证据 `.superpowers/sdd/2026-11-04-session-inspect/evidence/live-session-inspect.json`；**待用户重启 3080 Host** 后新工具才对顶层 Agent 可见；
+   跨会话 FTS 未启用（web profile `openAt: never`），`session_find` 仅单会话本地扫描。
    功能五（2026-10-17）：**已实现并实机通过**（`instruction-hint` epoch 感知 recovery + `context-gate.allowKinds`；单测 liangshen 76/76）；用户重启后会话 `session-aa65c681…`：压缩@104 → recovery-hint@111 → 首请求 tools=2 → 模型重读 AGENTS.md@116，verifier exit=0。证据本机 `.superpowers/sdd/2026-10-17-compaction-recovery-hint/`；空预设未单独跑 recovery。
 3. 任何新增「待裁定」先做口径溯源并落盘，已有裁定不重复问（见 `docs/AGENTS.md` §二）。
 4. 用户 2026-10-17 已授权本阶段 `git commit` + push 到 `git@github.com:c1589190/DSHOptimizeMosire.git`（main）。
