@@ -27,6 +27,15 @@ import { dirname, join } from 'node:path'
 
 import { OPTIMIZE_DEFAULTS, optimizeJobOutput } from './optimize.js'
 
+/**
+ * Cross-bundle anchored bootstrap gate (see the anchored preset's
+ * `tool-bootstrap.mjs`). DSH 0.2.2 keeps a scope's own tool registrations
+ * exempt from `tools.restrict()`, so host features registered into the
+ * Agent's scope hide themselves through the supported per-step `when`
+ * condition instead: the preset publishes this symbol on the Agent and the
+ * condition follows its phase. Absent symbol => ordinary visibility.
+ */
+
 /** Cordis plugin name used by loader diagnostics. */
 export const name = 'job-tools'
 
@@ -339,7 +348,7 @@ function installTools(agent, jobs, cfg) {
  * @param ctx Host Cordis context.
  * @param config Raw `jobTools` config; invalid values throw at activation.
  */
-export function apply(ctx, config = {}) {
+export function apply(ctx, config = {}, gate) {
   const cfg = normalizeConfig(config)
   /** @type {Map<object, () => void>} */
   const installed = new Map()
@@ -394,7 +403,8 @@ export function apply(ctx, config = {}) {
       return
     }
     try {
-      installed.set(agent, installTools(agent, jobs, cfg))
+      const mount = () => installTools(agent, jobs, cfg)
+      installed.set(agent, gate === undefined ? mount() : gate.mount(agent, mount))
       writeStatus()
     } catch (error) {
       warn(`could not install job tools for agent "${agentId(agent) ?? 'unknown'}": ${String(error?.message ?? error)}`)

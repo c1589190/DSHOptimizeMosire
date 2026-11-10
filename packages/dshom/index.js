@@ -12,6 +12,9 @@ import { apply as applyGoalConfirm } from '../dsh-goal-confirm/lib/index.js'
 import { apply as applySubagentAccess } from '../dsh-subagent-access/lib/index.js'
 import { apply as applyJobTools } from '../dsh-job-tools/lib/index.js'
 import { apply as applySessionImport } from '../dsh-session-import/lib/index.js'
+import { apply as applyPromptLabSession } from '../dsh-prompt-lab-session/lib/index.js'
+import { apply as applySessionInspect } from '../dsh-session-inspect/lib/index.js'
+import { createToolGate } from './tool-gate.js'
 
 /** Cordis plugin name used by loader diagnostics. */
 export const name = 'dshom'
@@ -43,19 +46,32 @@ function whenReady(ctx, services, mount) {
 export function apply(ctx, config = {}) {
   const source = config !== null && typeof config === 'object' ? config : {}
   const features = source.features !== null && typeof source.features === 'object' ? source.features : {}
+  // Shared by every feature that installs tools: anchored presets defer their
+  // tool group until the first durable promotion signal.
+  const toolGate = createToolGate(ctx)
 
   if (features.presets !== false) applyLiangshen(ctx)
   if (features.goalConfirm !== false) applyGoalConfirm(ctx, source.goalConfirm ?? {})
   if (features.subagentAccess !== false) {
     const subagentConfig = source.subagentAccess ?? {}
-    whenReady(ctx, ['agents', 'subagents'], (ready) => applySubagentAccess(ready, subagentConfig))
+    whenReady(ctx, ['agents', 'subagents'], (ready) => applySubagentAccess(ready, subagentConfig, toolGate))
   }
   if (features.jobTools !== false) {
     const jobConfig = source.jobTools ?? {}
-    whenReady(ctx, ['agents', 'jobs'], (ready) => applyJobTools(ready, jobConfig))
+    whenReady(ctx, ['agents', 'jobs'], (ready) => applyJobTools(ready, jobConfig, toolGate))
   }
   if (features.sessionImport !== false) {
     const importConfig = source.sessionImport ?? {}
     whenReady(ctx, ['sessionPersistence'], (ready) => applySessionImport(ready, importConfig))
+  }
+  if (features.promptLabSession !== false) {
+    const promptLabConfig = source.promptLabSession ?? {}
+    whenReady(ctx, ['agents', 'sessionController', 'commands', 'workspaceRegistry'], (ready) =>
+      applyPromptLabSession(ready, promptLabConfig, toolGate),
+    )
+  }
+  if (features.sessionInspect !== false) {
+    const inspectConfig = source.sessionInspect ?? {}
+    whenReady(ctx, ['agents', 'sessionQuery'], (ready) => applySessionInspect(ready, inspectConfig, toolGate))
   }
 }

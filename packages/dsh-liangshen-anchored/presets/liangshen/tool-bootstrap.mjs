@@ -76,6 +76,17 @@
 
 import { createEpochPromotion } from './compaction-epoch.mjs'
 
+/**
+ * Cross-bundle gate for tools that host plugins register into the Agent's OWN
+ * scope. `tools.restrict()` deliberately never hides a scope's own
+ * registrations (DSH 0.2.2 `ToolsService.view()`: own tools are re-added after
+ * the restriction intersection), so the anchored bootstrap publishes its phase
+ * on the Agent object and those registrations consult `when`. The symbol is
+ * global (`Symbol.for`) so the bundle's feature packages can share it without
+ * importing this preset package. Value: `() => boolean`, true when the Agent's
+ * ordinary catalog is allowed (promoted / not an anchored bootstrap).
+ */
+
 /** Cordis plugin name used by loader diagnostics. */
 export const name = 'anchored-tool-bootstrap'
 
@@ -192,7 +203,6 @@ export function apply(ctx, config) {
   const compactionTools = stringListOrEmpty(source.compactionTools, 'compactionTools')
 
   const promotion = createEpochPromotion(promoteEvents, { includeSubagents })
-  ctx.on('session/event', (session, event) => promotion.observe(session, event))
 
   let warned = false
   const warnOnce = (message) => {
@@ -204,6 +214,86 @@ export function apply(ctx, config) {
       // Logger unavailable — the guard exists only to avoid spamming.
     }
   }
+
+  // DSH 0.2.2 (and later) assembles tools AFTER the `system-prompt/assemble`
+  // waterfall and puts them back on the result, so narrowing the assembly no
+  // longer reaches the request. The supported equivalent is an agent-scoped
+  // tool restriction: `tools.restrict()` intersects the calling scope's
+  // restriction layer into `tools.resolve()`, which the loop calls before
+  // every step. It is applied on `agent/created` (after the preset is
+  // mounted), released on the epoch promotion, and re-applied after a
+  // compaction demotion. On older harnesses without `tools.restrict` the
+  // assemble narrowing below remains the implementation.
+  /** session id -> { agent, release } */
+  const phases = new Map()
+
+  const releaseToolRestriction = (entry) => {
+    if (entry.release === undefined) return
+    const release = entry.release
+    entry.release = undefined
+    try {
+      release()
+    } catch {
+      // The agent scope may already be disposed; the restriction is gone too.
+    }
+  }
+
+  const syncToolRestriction = (agent) => {
+    const session = agent?.session
+    if (session === undefined) return
+    const entry = phases.get(session.id)
+    if (entry === undefined) return
+    const status = promotion.status(agent)
+    if (status.promoted) {
+      releaseToolRestriction(entry)
+      return
+    }
+    if (entry.release !== undefined) return
+    const tools = agent.ctx?.tools
+    if (tools === undefined || typeof tools.restrict !== 'function') return
+    const keep = new Set(bootstrapTools)
+    if (status.boundary >= 0) for (const toolName of compactionTools) keep.add(toolName)
+    try {
+      entry.release = tools.restrict({ allow: [...keep] })
+    } catch (error) {
+      // A missing bootstrap tool (or an older `restrict` contract) must not
+      // brick the session: keep the full catalog and warn once.
+      warnOnce(
+        `${name}: tool restriction unavailable, exposing the full catalog: ${String((error && error.message) || error)}`,
+      )
+    }
+  }
+
+  ctx.on('agent/created', ({ agent }) => {
+    const session = agent?.session
+    if (session === undefined) return
+    if (!phases.has(session.id)) phases.set(session.id, { agent, release: undefined })
+    try {
+      syncToolRestriction(agent)
+    } catch (error) {
+      warnOnce(`${name}: tool restriction setup failed, exposing the full catalog: ${String((error && error.message) || error)}`)
+    }
+  })
+
+  ctx.on('agent/disposed', ({ agent }) => {
+    const session = agent?.session
+    if (session === undefined) return
+    const entry = phases.get(session.id)
+    if (entry === undefined) return
+    releaseToolRestriction(entry)
+    phases.delete(session.id)
+  })
+
+  ctx.on('session/event', (session, event) => {
+    promotion.observe(session, event)
+    const entry = phases.get(session.id)
+    if (entry === undefined) return
+    try {
+      syncToolRestriction(entry.agent)
+    } catch (error) {
+      warnOnce(`${name}: tool restriction sync failed, exposing the full catalog: ${String((error && error.message) || error)}`)
+    }
+  })
 
   /** Narrow the assembled catalog to a keep-set; validate required names. */
   const keepTools = (assembled, keep, missingAllowsFullCatalog) => {
@@ -225,6 +315,11 @@ export function apply(ctx, config) {
   ctx.on('system-prompt/assemble', async (_assembly, context, next) => {
     // Downstream errors propagate untouched; only this filter's own logic is guarded.
     const assembled = await next()
+    // DSH 0.2.2+ owns tool declarations after this waterfall and restores them
+    // on the result (`{ ...transformed, tools }`), so there is nothing to
+    // narrow here. The agent-scoped `tools.restrict()` above is the
+    // request-visible implementation on those versions.
+    if (!Array.isArray(assembled?.tools)) return assembled
     try {
       const status = promotion.status(context.agent)
       if (status.promoted) {

@@ -138,7 +138,6 @@ export function apply(ctx, config) {
   const allowKinds = allowKindList(source.allowKinds, 'allowKinds')
 
   const promotion = createEpochPromotion(promoteEvents, { includeSubagents })
-  ctx.on('session/event', (session, event) => promotion.observe(session, event))
 
   let warned = false
   const warnOnce = (message) => {
@@ -151,16 +150,126 @@ export function apply(ctx, config) {
     }
   }
 
-  // Path (a): blank the dynamic runtime-context contributions while the
-  // session is unpromoted. Covers the whole SystemPrompt.context() family
-  // without enumerating it; the loop's snapshot projection then stays silent
-  // and diffs exactly ONE fresh snapshot in at the first promoted request.
+  // DSH 0.2.2 no longer lets the assembly waterfall remove dynamic context:
+  // the loop calls `refreshContext()` on every step and restores required
+  // registrations, and `working-directory` force-writes its contribution from
+  // an outermost after-next hook. The supported equivalent is agent-scoped
+  // suppression: `suppressRuntimeContext()` drops every optional context for
+  // the calling scope, and a scoped empty provider shadows the required
+  // `working-directory:current` contribution so its text renders empty. Both
+  // are installed on `agent/created`, disposed on the epoch promotion (the
+  // projection then diffs exactly one fresh snapshot into the next request),
+  // and reinstalled after a compaction demotion. On older harnesses without
+  // the suppression API the assemble blanking below remains the
+  // implementation.
+  /** session id -> { agent, releases } */
+  const phases = new Map()
+
+  const releaseContextGate = (entry) => {
+    const releases = entry.releases
+    entry.releases = []
+    for (const release of releases.reverse()) {
+      try {
+        release()
+      } catch {
+        // The agent scope may already be disposed; the effect is gone too.
+      }
+    }
+  }
+
+  const applyContextGate = (agent) => {
+    const entry = phases.get(agent.session.id)
+    if (entry === undefined) return
+    const systemPrompt = agent.ctx?.systemPrompt
+    if (systemPrompt === undefined) return
+    // 0.2.1 and earlier: no scoped suppression API — use the assemble path.
+    if (typeof systemPrompt.suppressRuntimeContext !== 'function') return
+    if (typeof systemPrompt.context !== 'function') return
+    const releases = []
+    try {
+      releases.push(systemPrompt.suppressRuntimeContext())
+      const order = typeof systemPrompt.getContextOrder === 'function'
+        ? systemPrompt.getContextOrder('WORKING_DIRECTORY')
+        : undefined
+      // Scoped providers shadow global providers of the same name, so this
+      // empties the required working-directory context for this agent only.
+      releases.push(systemPrompt.context({
+        name: 'working-directory:current',
+        order: Number.isFinite(order) ? order : 100,
+        required: true,
+        interpolate: false,
+        text: '',
+      }))
+    } catch (error) {
+      for (const release of releases.reverse()) {
+        try {
+          release()
+        } catch {
+          // Partial registration cleanup only.
+        }
+      }
+      warnOnce(`${name}: runtime-context suppression failed, keeping contexts: ${String((error && error.message) || error)}`)
+      return
+    }
+    entry.releases = releases
+  }
+
+  const syncContextGate = (agent) => {
+    const session = agent?.session
+    if (session === undefined) return
+    const entry = phases.get(session.id)
+    if (entry === undefined) return
+    const status = promotion.status(agent)
+    if (status.promoted) {
+      releaseContextGate(entry)
+      return
+    }
+    if (entry.releases.length > 0) return
+    applyContextGate(agent)
+  }
+
+  ctx.on('agent/created', ({ agent }) => {
+    if (agent?.session === undefined) return
+    if (!phases.has(agent.session.id)) phases.set(agent.session.id, { agent, releases: [] })
+    try {
+      syncContextGate(agent)
+    } catch (error) {
+      warnOnce(`${name}: runtime-context suppression setup failed, keeping contexts: ${String((error && error.message) || error)}`)
+    }
+  })
+
+  ctx.on('agent/disposed', ({ agent }) => {
+    if (agent?.session === undefined) return
+    const entry = phases.get(agent.session.id)
+    if (entry === undefined) return
+    releaseContextGate(entry)
+    phases.delete(agent.session.id)
+  })
+
+  ctx.on('session/event', (session, event) => {
+    promotion.observe(session, event)
+    const entry = phases.get(session.id)
+    if (entry === undefined) return
+    try {
+      syncContextGate(entry.agent)
+    } catch (error) {
+      warnOnce(`${name}: runtime-context suppression sync failed, keeping contexts: ${String((error && error.message) || error)}`)
+    }
+  })
+
+  // Path (a) legacy fallback: blank the dynamic runtime-context contributions
+  // while the session is unpromoted. On 0.2.2 the agent-scoped suppression
+  // above already covers assemble + refreshContext, so this hook leaves the
+  // assembly alone (the loop restores required providers anyway).
   ctx.on('system-prompt/assemble', async (_assembly, context, next) => {
     // Downstream errors propagate untouched; only this filter's own logic is guarded.
     const assembled = await next()
     if (enabled === false) return assembled
     try {
       if (promotion.status(context.agent).promoted) return assembled
+      const session = context.agent?.session
+      const entry = session === undefined ? undefined : phases.get(session.id)
+      if (entry !== undefined && entry.releases.length > 0) return assembled
       if (!Array.isArray(assembled.contexts) || assembled.contexts.length === 0) return assembled
       return { ...assembled, contexts: [] }
     } catch (error) {

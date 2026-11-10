@@ -1,0 +1,23 @@
+{
+  "name": "@mosire/dsh-session-inspect",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Read-only agent tools for inspecting other DSH sessions: list, current model context, raw log, event windows, and in-session text search.",
+  "exports": {
+    ".": "./lib/index.js",
+    "./package.json": "./package.json"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/dsh": ">=0.2.0-rc.2"
+  },
+  "dsh": {
+    "engines": {
+      "dsh": ">=0.2.0-rc.2"
+    }
+  },
+  "files": [
+    "lib/",
+    "README.md"
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "name": "@mosire/dsh-prompt-lab-session",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Agent-callable tool that creates a sibling session in a DSH workspace under the prompt-lab preset, applies a chosen system prompt, and optionally runs one task.",
+  "exports": {
+    ".": "./lib/index.js",
+    "./package.json": "./package.json"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/dsh": ">=0.2.0-rc.2"
+  },
+  "dsh": {
+    "engines": {
+      "dsh": ">=0.2.0-rc.2"
+    }
+  },
+  "files": [
+    "lib/",
+    "README.md"
+  ]
+}

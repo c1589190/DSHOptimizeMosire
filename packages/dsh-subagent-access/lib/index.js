@@ -43,6 +43,15 @@ import { dirname, join } from 'node:path'
 
 import { TOOL_NAMES, catalogRows, normalizeConfig, shouldInstall } from './catalog.js'
 
+/**
+ * Cross-bundle anchored bootstrap gate (see the anchored preset's
+ * `tool-bootstrap.mjs`). DSH 0.2.2 keeps a scope's own tool registrations
+ * exempt from `tools.restrict()`, so host features registered into the
+ * Agent's scope hide themselves through the supported per-step `when`
+ * condition instead: the preset publishes this symbol on the Agent and the
+ * condition follows its phase. Absent symbol => ordinary visibility.
+ */
+
 /** Cordis plugin name used by loader diagnostics. */
 export const name = 'subagent-access'
 
@@ -419,7 +428,7 @@ function install(ctx, agent, agents, subagents) {
  * @param ctx - Host Cordis context.
  * @param config - raw plugin config; invalid values throw here, at activation.
  */
-export function apply(ctx, config) {
+export function apply(ctx, config, gate) {
   const cfg = normalizeConfig(config)
 
   /** One entry per Agent scope currently receiving the tools. @type {Map<object, () => void>} */
@@ -479,7 +488,8 @@ export function apply(ctx, config) {
       return
     }
     try {
-      installed.set(agent, install(ctx, agent, agents, subagents))
+      const mount = () => install(ctx, agent, agents, subagents)
+      installed.set(agent, gate === undefined ? mount() : gate.mount(agent, mount))
       writeStatus()
     } catch (error) {
       warn(`could not install tools for agent "${agentId(agent) ?? 'unknown'}": ${String(error?.message ?? error)}`)

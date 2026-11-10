@@ -394,8 +394,20 @@
     - id: tool-subagent-control
       name: '@deepseek-ai/dsh-tool-subagent-control'
 
+    # `list_agents` used to be a separate subpath plugin. DSH 0.2.2 folded it
+    # into the main `tool-subagent-control` plugin and dropped the
+    # `./list-agents` export, so this row would fail to resolve there (and the
+    # main plugin would register `list_agents` a second time). Keep the row so
+    # 0.2.1 still mounts its own copy, and disable it wherever the subpath is
+    # gone. `disabled` is evaluated before the row is resolved (the registry
+    # skips disabled rows in its audit), so the guard itself never fails.
     - id: tool-subagent-list-agents
       name: '@deepseek-ai/dsh-tool-subagent-control/list-agents'
+      disabled: !!js >-
+        (() => {
+          const require = process.getBuiltinModule('node:module').createRequire(ctx.baseUrl)
+          try { require.resolve('@deepseek-ai/dsh-tool-subagent-control/list-agents'); return false } catch { return true }
+        })()
 
     - id: tool-subagent
       name: '@deepseek-ai/dsh-tool-subagent'
