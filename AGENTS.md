@@ -133,7 +133,8 @@
 - `docs/superpowers/status/2026-11-04-prompt-lab-session.md` —— 功能十：`prompt_lab_workspaces` + `prompt_lab_session` 两工具、工作区必填、model 事件、单测 12/12、实机 spawn-only 12/12、待重启 3080。
 - `docs/superpowers/status/2026-11-04-session-inspect.md` —— 功能十一：`session_list` / `session_read` / `session_find` 只读工具、surface/raw/event 三模式、单测 14/14、实机 18/18、待重启 3080。
 - `docs/superpowers/status/2026-11-05-dsh-0.2.2-upgrade.md` —— 2026-11-05 DSH 0.2.2 适配：子路径守卫、`tools.restrict`/`suppressRuntimeContext` 路径、dshom 通用工具组门、实机 12/12。
-- `docs/superpowers/status/2026-11-10-remove-chat-timing-client.md` —— 2026-11-10 移除 dshom 客户端 half（时间标注 + dock goal 开关）、Host-only 安装、liangshen 3099 E2E 12/12（**最新状态**）。
+- `docs/superpowers/status/2026-11-10-remove-chat-timing-client.md` —— 2026-11-10 移除 dshom 客户端 half（时间标注 + dock goal 开关）、Host-only 安装、liangshen 3099 E2E 12/12。
+- `docs/superpowers/status/2026-11-15-subagent-model-selection-key.md` —— 2026-11-15 修复梁神预设 DSH 0.2.2 旧键：`modelSelection` + `modelDiscovery`、单测/3099 验证、首轮 identity 泄漏已知问题、3080 重启要求（**最新状态**）。
 
 ## 五、交叉纪律要点（每条只是概述 + 指针）
 
@@ -164,7 +165,7 @@
 ## 七、已裁定与当前门禁
 
 **功能一（梁神模式复刻）**：D-001=A 锚定式 v7 保真复刻；D-002=A Web profile 插件 bundle；D-003=B 复刻 + 上游小改进；
-D-004=沿用「梁神模式」/ order 5 / MIT；D-005=协议级 smoke + 12 会话小矩阵；D-006=基线本地 v7 + 吸收 `promoteOn: either` / `context-gate` / Windows 后台任务；D-010（2026-10-17）=子 Agent 支持按次模型/档位选择（`modelSelectionSettings: true`），默认档位 `high`（主预设与空提示词变体同配）。
+D-004=沿用「梁神模式」/ order 5 / MIT；D-005=协议级 smoke + 12 会话小矩阵；D-006=基线本地 v7 + 吸收 `promoteOn: either` / `context-gate` / Windows 后台任务；D-010（2026-10-17，2026-11-15 修键）=子 Agent 支持按次模型/档位选择（DSH 0.2.2 键：`modelSelection: true` + `modelDiscovery: true`；旧 `modelSelectionSettings` 已废弃），默认档位 `high`（主预设与空提示词变体同配）。
 
 **功能二（goal 续轮确认门）**：G-001=A 官方提问卡片；G-002=A 全局挂载；G-003=A 关闭卡片=取消并删 goal；G-004=A 独立 bundle。
 
@@ -263,8 +264,9 @@ composer 槽的 fixed 浮层必须 portal 到 body；旧 `LiveTiming`/goal 菜�
    M2 锚定语义实验未开始）；
    功能四 **A1+B1/B2/B3 已实机验证**（用户重启 DSH 后：两预设 `broken:null`；新会话 `session-c57e32e7…` 选空预设，
    verifier exit=0：system 恰好一个空格、首请求双工具、零注入、晋升 48 工具）；仅空预设的**压缩重锚**未验（需 /compact）。
-   功能一追补 **D-010**：liangshen 两预设的 `tool-subagent` 行已开 `modelSelectionSettings: true` + `agentOptions.reasoningEffort: high`，
-   重挂载后 `broken:null`；真实「新会话按次换模型/档位」wire 待新会话验证（旧会话不追溯）。
+   功能一追补 **D-010**：liangshen 两预设的 `tool-subagent` 行已开 `modelSelection: true` + `modelDiscovery: true` +
+   `agentOptions.reasoningEffort: high`（2026-11-15 修 0.2.2 旧键），重挂载后 `broken:null`；
+   真实「新会话按次换模型/档位」wire 见新 status（旧会话不追溯）。
    功能六（2026-10-17）：三个 Chat 槽 occupants `active:true`；LiveTiming overlay（运行中实时 `开始 HH:MM · 已用 …`，D-019）；
    **用户已确认**：真实工具运行（`sleep 5`，22:21:30–35）期间命令右侧出现实时计时标签。
    **2026-11-10（D-033）已整体移除该 client half**（0.2.2 composer fixed 包含块导致坐标错位）；`@mosire/dshom` 现为 Host-only。

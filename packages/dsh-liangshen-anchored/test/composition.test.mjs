@@ -100,10 +100,14 @@ test('the empty-system persona row keeps the version-adaptive complete prompt co
   assert.match(variantYml, /text: persona/u)
 })
 
-test('the delegation row enables per-call model selection with default effort high', () => {
-  assert.match(yml, /modelSelectionSettings: true/u)
+test('the delegation row enables per-call model selection with discovery and default effort high', () => {
+  assert.match(yml, /modelSelection: true/u)
+  assert.match(yml, /modelDiscovery: true/u)
+  assert.doesNotMatch(yml, /modelSelectionSettings:/u)
   assert.match(yml, /agentOptions:\n\s+reasoningEffort: high/u)
   // The generated empty-system variant must carry the same delegation config.
-  assert.match(variantYml, /modelSelectionSettings: true/u)
+  assert.match(variantYml, /modelSelection: true/u)
+  assert.match(variantYml, /modelDiscovery: true/u)
+  assert.doesNotMatch(variantYml, /modelSelectionSettings:/u)
   assert.match(variantYml, /agentOptions:\n\s+reasoningEffort: high/u)
 })
