@@ -134,7 +134,7 @@
 - `docs/superpowers/status/2026-11-04-session-inspect.md` —— 功能十一：`session_list` / `session_read` / `session_find` 只读工具、surface/raw/event 三模式、单测 14/14、实机 18/18、待重启 3080。
 - `docs/superpowers/status/2026-11-05-dsh-0.2.2-upgrade.md` —— 2026-11-05 DSH 0.2.2 适配：子路径守卫、`tools.restrict`/`suppressRuntimeContext` 路径、dshom 通用工具组门、实机 12/12。
 - `docs/superpowers/status/2026-11-10-remove-chat-timing-client.md` —— 2026-11-10 移除 dshom 客户端 half（时间标注 + dock goal 开关）、Host-only 安装、liangshen 3099 E2E 12/12。
-- `docs/superpowers/status/2026-11-15-subagent-model-selection-key.md` —— 2026-11-15 修复梁神预设 DSH 0.2.2 旧键：`modelSelection` + `modelDiscovery`、单测/3099 验证、首轮 identity 泄漏已知问题、3080 重启要求（**最新状态**）。
+- `docs/superpowers/status/2026-11-15-subagent-model-selection-key.md` —— 2026-11-15 修复梁神预设 DSH 0.2.2 旧键（`modelSelection` + `modelDiscovery`）与首轮 `subagent:identity` 泄漏（required context 空 shadow）；单测/3099 验证、3080 重启要求（**最新状态**）。
 
 ## 五、交叉纪律要点（每条只是概述 + 指针）
 

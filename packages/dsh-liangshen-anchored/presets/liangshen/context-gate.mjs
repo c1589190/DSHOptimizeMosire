@@ -186,20 +186,41 @@ export function apply(ctx, config) {
     if (typeof systemPrompt.suppressRuntimeContext !== 'function') return
     if (typeof systemPrompt.context !== 'function') return
     const releases = []
+    const contextOrder = (name) => {
+      try {
+        const order = typeof systemPrompt.getContextOrder === 'function'
+          ? systemPrompt.getContextOrder(name)
+          : undefined
+        return Number.isFinite(order) ? order : undefined
+      } catch {
+        return undefined
+      }
+    }
     try {
       releases.push(systemPrompt.suppressRuntimeContext())
-      const order = typeof systemPrompt.getContextOrder === 'function'
-        ? systemPrompt.getContextOrder('WORKING_DIRECTORY')
-        : undefined
-      // Scoped providers shadow global providers of the same name, so this
-      // empties the required working-directory context for this agent only.
+      // Scoped providers shadow global providers of the same name, so these
+      // empty required shadows keep the required facts out of the gated first
+      // request. `working-directory:current` is the Host's required context;
+      // DSH 0.2.2-rc.3's tool-subagent-control adds `subagent:identity`.
+      // Suppression intentionally keeps required contexts, so every required
+      // name needs its own shadow.
       releases.push(systemPrompt.context({
         name: 'working-directory:current',
-        order: Number.isFinite(order) ? order : 100,
+        order: contextOrder('WORKING_DIRECTORY') ?? 100,
         required: true,
         interpolate: false,
         text: '',
       }))
+      const identityOrder = contextOrder('SUBAGENT_DELEGATION')
+      if (identityOrder !== undefined) {
+        releases.push(systemPrompt.context({
+          name: 'subagent:identity',
+          order: identityOrder,
+          required: true,
+          interpolate: false,
+          text: '',
+        }))
+      }
     } catch (error) {
       for (const release of releases.reverse()) {
         try {
