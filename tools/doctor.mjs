@@ -7,8 +7,9 @@
  * property of our source tree, so this script verifies the three machine-local
  * couplings and repairs the two that are safe to rewrite:
  *
- *   1. `@mosire/dshom` is a profile dependency and is listed in
- *      `dsh.profile.bundles` (otherwise the Host half never mounts);
+ *   1. the profile uses either the all-in-one `@mosire/dshom` bundle or the
+ *      split layout (preset bundle + one bundle per feature), and every listed
+ *      bundle is a dependency with a resolvable patch;
  *   2. the preset peer farm resolves every `@deepseek-ai/*` row against the
  *      RUNNING DSH install (the Host plugin also refreshes it on every boot);
  *   3. the last preset declaration recorded `broken: null`.
@@ -64,21 +65,58 @@ const manifest = readManifest()
 const dependencies = manifest.dependencies ?? {}
 const bundles = manifest.dsh?.profile?.bundles ?? []
 
-if (dependencies['@mosire/dshom'] === undefined) {
-  problems.push('@mosire/dshom is missing from profile dependencies (run: dsh plugin --profile ' + profile + ' add @mosire/dshom)')
-} else if (!bundles.includes('@mosire/dshom')) {
-  problems.push('@mosire/dshom is installed but not listed in dsh.profile.bundles')
-  if (fix) {
-    manifest.dsh = { ...manifest.dsh, profile: { ...manifest.dsh?.profile, bundles: [...bundles, '@mosire/dshom'] } }
-    writeManifest(manifest)
-    fixes.push('added @mosire/dshom to dsh.profile.bundles (restart DSH)')
-  }
+/** Split layout: one profile bundle per feature, plus the preset bundle. */
+const SPLIT_BUNDLES = [
+  '@mosire/dsh-liangshen-anchored',
+  '@mosire/dsh-goal-confirm',
+  '@mosire/dsh-subagent-access',
+  '@mosire/dsh-job-tools',
+  '@mosire/dsh-session-import',
+  '@mosire/dsh-prompt-lab-session',
+  '@mosire/dsh-session-inspect',
+]
+const splitListed = SPLIT_BUNDLES.filter((name) => bundles.includes(name))
+const splitMode = splitListed.length > 0
+const dshomListed = bundles.includes('@mosire/dshom')
+
+if (splitMode && dshomListed) {
+  problems.push('both @mosire/dshom and the split bundles are listed in dsh.profile.bundles; pick one layout (duplicate tools otherwise)')
+}
+if (!splitMode && !dshomListed) {
+  problems.push('no dshom bundle is listed in dsh.profile.bundles (add @mosire/dshom, or the split bundles)')
 }
 
-const bundleDir = join(profileDir, 'node_modules', '@mosire', 'dshom')
-if (!existsSync(bundleDir)) problems.push(`bundle package is not linked at ${bundleDir}`)
-const patchPath = join(bundleDir, 'cordis.patch.yml')
-if (existsSync(bundleDir) && !existsSync(patchPath)) problems.push(`bundle patch is missing: ${patchPath}`)
+/** Validate one listed bundle: dependency, node_modules link and patch file. */
+function checkBundle(name) {
+  const short = name.split('/')[1]
+  if (dependencies[name] === undefined) {
+    problems.push(`${name} is listed in dsh.profile.bundles but missing from profile dependencies`)
+    if (fix && name !== '@mosire/dshom') {
+      const dir = join(repoRoot, 'packages', short)
+      if (existsSync(dir)) {
+        manifest.dependencies = { ...manifest.dependencies, [name]: `link:${dir}` }
+        writeManifest(manifest)
+        fixes.push(`added ${name} as a link: dependency (restart DSH)`)
+      }
+    }
+  }
+  const dir = join(profileDir, 'node_modules', '@mosire', short)
+  if (!existsSync(dir)) problems.push(`bundle package is not linked at ${dir}`)
+  const patch = join(dir, 'cordis.patch.yml')
+  if (existsSync(dir) && !existsSync(patch)) problems.push(`bundle patch is missing: ${patch}`)
+}
+
+if (splitMode) {
+  for (const name of splitListed) checkBundle(name)
+  const missing = SPLIT_BUNDLES.filter((name) => !bundles.includes(name))
+  if (missing.length > 0) notes.push(`split layout omits (disabled): ${missing.join(', ')}`)
+} else if (dshomListed) {
+  // All-in-one layout: the umbrella must stay installed and listed.
+  if (dependencies['@mosire/dshom'] === undefined) {
+    problems.push('@mosire/dshom is missing from profile dependencies (run: dsh plugin --profile ' + profile + ' add @mosire/dshom)')
+  }
+  checkBundle('@mosire/dshom')
+}
 
 const names = requiredPeerNames(presetRoot)
 const running = runningDshAnchor()
@@ -123,8 +161,16 @@ if (!existsSync(statusPath)) {
 } else {
   try {
     const status = JSON.parse(readFileSync(statusPath, 'utf8'))
-    if (status.broken !== null && status.broken !== undefined) problems.push(`last preset declaration is broken: ${status.broken}`)
-    else notes.push('last preset declaration: broken null')
+    const presets = Array.isArray(status.presets) ? status.presets : []
+    if (presets.length > 0) {
+      const broken = presets.filter((preset) => preset.broken !== null && preset.broken !== undefined)
+      if (broken.length > 0) problems.push(`last preset declarations are broken: ${broken.map((preset) => preset.id).join(', ')}`)
+      else notes.push(`last preset declarations: ${presets.length} preset(s), broken null`)
+    } else if (status.broken !== null && status.broken !== undefined) {
+      problems.push(`last preset declaration is broken: ${status.broken}`)
+    } else {
+      notes.push('last preset declaration: broken null')
+    }
     notes.push(`status pid: ${status.pid}`)
   } catch (error) {
     problems.push(`cannot read preset status: ${String(error?.message ?? error)}`)

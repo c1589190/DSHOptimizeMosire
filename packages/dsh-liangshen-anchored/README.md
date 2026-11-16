@@ -3,7 +3,8 @@
 「梁神模式（锚定式）」的现代复刻：把社区已停用的 **anchored standard** 梁神预设，以官方
 `@deepseek-ai/dsh-agent-preset` 声明机制重新装回 DSH Web profile。
 
-本 bundle 声明**三个预设**：
+本 bundle 的 patch 插入 **3 行**，每行只声明一个预设（插件管理页可分别开关）；直接 `apply` 一次仍可声明全部三个
+（`@mosire/dshom` 单 bundle 布局就是这么用的）。三个预设：
 
 | 预设 id | 名称 | 说明 |
 |---|---|---|

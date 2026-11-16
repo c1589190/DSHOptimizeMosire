@@ -127,3 +127,31 @@ test('config.presets rejects unknown keys and non-boolean values', () => {
   assert.throws(() => normalizePresetSelection({ emptySystem: 'no' }), /must be a boolean/u)
   assert.throws(() => normalizePresetSelection([]), /presets must be an object/u)
 })
+
+test('per-preset bundle rows merge into one diagnostic file', async () => {
+  const home = mkdtempSync(join(tmpdir(), 'dshom-presets-merge-'))
+  const previous = process.env.DSH_HOME
+  process.env.DSH_HOME = home
+  try {
+    const registry = makeRegistry()
+    await declarePresets(makeCtx(registry), {
+      syncPeers: fakeSyncPeers,
+      statusMode: 'merge',
+      presets: { liangshen: true, emptySystem: false, promptLab: false },
+    })
+    await declarePresets(makeCtx(registry), {
+      syncPeers: fakeSyncPeers,
+      statusMode: 'merge',
+      presets: { liangshen: false, emptySystem: true, promptLab: false },
+    })
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    const status = JSON.parse(readFileSync(join(home, 'liangshen-anchored-status.json'), 'utf8'))
+    assert.deepEqual(status.presets.map((preset) => preset.id), ['liangshen', 'liangshen-empty-system'])
+    assert.deepEqual(status.enabled, { liangshen: true, emptySystem: true, promptLab: false })
+    assert.equal(status.declared, true)
+  } finally {
+    if (previous === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = previous
+    rmSync(home, { recursive: true, force: true })
+  }
+})

@@ -36,6 +36,9 @@ goal 确认门与 `/import` 是命令/监听器，不占工具面。
 
 ## 安装与配置
 
+> **2026-11-16 起，本机 web profile 使用拆分布局**：`dsh-liangshen-anchored` + 6 个功能 bundle 共 7 行，
+> 插件页逐个可开关；`@mosire/dshom` 仍保留为单 bundle 布局（二选一）。下面是单 bundle 布局的配置：
+
 profile 的 `dsh.profile.bundles` 里只加一行 `@mosire/dshom`（本机为 `link:` 到 `packages/dshom`）：
 
 ```yaml

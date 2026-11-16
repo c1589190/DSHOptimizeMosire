@@ -80,3 +80,39 @@
 - 3080 Host 未重启；默认 `@mosire/dshom` 行为不变（全开）。要用 `config.presets` / 独立 bundle 需改 profile 后重启。
 - 子 Agent 首轮 4 工具（`job_wait`/`job_read` 泄漏）这一已知缺口本轮未动，见
   `docs/superpowers/status/2026-11-15-plugin-inventory.md`。
+
+## 2026-11-16 收尾：profile 切到 7-bundle 布局（用户反馈「不还是只有一个包」）
+
+用户看到插件页「包含的组件 共 1 个」，指出代码拆包没有反映到**安装形态**。处理：
+
+- **预设 bundle patch 改为 3 行**：每行只声明一个预设（`config.presets` 子集 + `statusMode: merge`），
+  插件页因此显示 3 个可独立开关的预设组件。`writeStatus` 增加 merge 模式（按 `$DSH_HOME` 路径合并，
+  三行不会互相覆盖诊断文件），peer farm 改为进程内只重建一次。
+- **本机 web profile**（`~/.dsh/profiles/web/package.json`，不在 git 内）：
+  - `dsh.profile.bundles` 用 7 个 bundle 替换 `@mosire/dshom`：
+    `liangshen-anchored` + `goal-confirm` + `subagent-access` + `job-tools` + `session-import` + `prompt-lab-session` + `session-inspect`；
+  - dependencies 补 7 个 `link:`，4 个新包补了 `node_modules/@mosire/*` 符号链接；
+  - 备份：`package.json.bak-subpackages-2026-11-16` / `cordis.patch.yml.bak-subpackages-2026-11-16`。
+- **`tools/doctor.mjs` 支持两种布局**：拆分布局下逐个校验已列 bundle 的依赖/link/patch，
+  不再把 `@mosire/dshom` 强行加回（之前会误判并破坏拆分布局）。
+- 文档：dshom README 增「两种装配布局」；preset README 说明 patch 3 行；根 README 标注当前 profile 布局。
+
+### 验证
+
+- `dsh --profile web --dump-config`：出现 3 个 preset 行（`preset-liangshen` / `preset-liangshen-empty-system` /
+  `preset-minimal-prompt-lab`）+ 6 个功能行；无 `@mosire/dshom` 行。
+- 真实 3099 E2E（拆分布局）：
+  - 预设列表含本仓 3 个且 `broken:null`；GUI「创建→切 liangshen」首请求仍 `["bash","str_replace_editor"]`、零注入，
+    晋升后含全部 feature 工具；
+  - profile patch `- id: preset-liangshen-empty-system disabled: true` → 本仓预设剩 `liangshen` + `minimal-prompt-lab` 两个；
+  - `node tools/doctor.mjs` → **OK**（拆分布局，3 个未列 bundle 记为 disabled note）。
+- 单测：`dsh-liangshen-anchored` **128/128**（新增 merge 状态测试）；其余同前，合计 **300/300**。
+  空预设变体 `in sync`。
+- 证据：`.superpowers/sdd/2026-11-16-preset-switch-anchor/evidence/verify-switch.json`（拆分布局回归）、
+  `.superpowers/sdd/2026-11-16-subpackages/evidence/verify-preset-switch.json`（行级关闭）。
+
+### 注意
+
+- profile 的 7-bundle 改动是**本机环境**，不在 git 内；3080 必须重启才会在插件页看到 7 个条目 / 3 个预设组件。
+- 单 bundle 布局（`@mosire/dshom`）仍可用，配置开关见 dshom README；两种布局不要同时启用。
+- 预设 3 行的诊断文件是合并写入（下一个 tick），重启后 `liangshen-anchored-status.json` 应显示 3 个 `broken:null`。

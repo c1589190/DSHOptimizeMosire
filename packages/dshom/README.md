@@ -11,6 +11,15 @@ DSH Optimize Mosire 的**默认入口 bundle**：把梁神预设、goal 确认�
 
 > **2026-11-16：所有功能和三个预设都可以单独开关；每个功能包也补上了自己的 `dsh.bundle.patch`，可以脱离 dshom 单独安装**（见「独立子包」）。
 
+## 两种装配布局（2026-11-16）
+
+| 布局 | profile 里列什么 | 插件页看到什么 | 开关方式 |
+|---|---|---|---|
+| 单 bundle（dshom） | 只列 `@mosire/dshom` | 1 个条目，1 个组件 | `config.features` / `config.presets` |
+| 拆分 bundle（当前 3080 profile 使用） | 预设 bundle + 6 个功能 bundle | **7 个条目**；预设 bundle 页内 3 个预设组件 | 在插件页逐个开关（写入 profile patch 的 `disabled` 行） |
+
+两种布局**二选一**；同时启用会重复 `apply()`。
+
 | 功能 | 实现 | 默认 | 开关 |
 |---|---|---|---|
 | 三个预设（`liangshen` / `liangshen-empty-system` / `minimal-prompt-lab`） | `../dsh-liangshen-anchored/lib/index.js` | 全开 | `presets.*` |
@@ -29,7 +38,7 @@ Host 入口按需调用各功能的既有 `apply`，不复制业务代码。四�
 不持久化 pnpm 版本目录；DSH 升级后不需要手动重链。装好后跑 `node tools/doctor.mjs` 可检查
 `dsh.profile.bundles` 条目、farm 链接与上次 preset 状态；`--fix` 会重新加回 bundle 条目并刷新 farm。
 
-## 配置
+## 配置（单 bundle 布局）
 
 ```yaml
 - id: dshom

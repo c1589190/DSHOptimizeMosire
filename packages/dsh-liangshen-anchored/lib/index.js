@@ -137,16 +137,63 @@ async function readMetadata(spec) {
   }
 }
 
-/** Best-effort local diagnostic: the last declaration outcome, readable by tools. */
-async function writeStatus(entry) {
+/** Diagnostic file path under `$DSH_HOME`. */
+function statusPath() {
   const home = process.env.DSH_HOME ?? join(homedir(), '.dsh')
-  const path = join(home, 'liangshen-anchored-status.json')
+  return join(home, 'liangshen-anchored-status.json')
+}
+
+/** Best-effort local diagnostic write; never breaks activation. */
+async function writeStatusAt(path, entry) {
   try {
     await mkdir(dirname(path), { recursive: true })
     await writeFile(path, `${JSON.stringify({ pid: process.pid, ...entry }, null, 2)}\n`, 'utf8')
   } catch {
     // Diagnostics must never break activation.
   }
+}
+
+/** Replace-mode write: the whole preset set came from one declaration call. */
+async function writeStatus(entry) {
+  await writeStatusAt(statusPath(), entry)
+}
+
+/**
+ * Merge-mode state for per-preset bundle rows: the preset package can be
+ * mounted three times with one preset each, and every row would otherwise
+ * overwrite the single diagnostic file with its own subset. Keyed by file path
+ * so an isolated DSH_HOME never shares state.
+ */
+const mergedStatus = new Map()
+
+/** Merge one row's declaration into the diagnostic file on the next tick. */
+function mergeStatus(entry) {
+  const path = statusPath()
+  const state = mergedStatus.get(path) ?? { presets: new Map(), enabled: {}, peers: undefined, timer: undefined }
+  for (const preset of entry.presets ?? []) state.presets.set(preset.id, preset)
+  for (const [key, value] of Object.entries(entry.enabled ?? {})) {
+    state.enabled[key] = Boolean(state.enabled[key] || value)
+  }
+  if (entry.peers !== undefined) state.peers = entry.peers
+  mergedStatus.set(path, state)
+  if (state.timer !== undefined) clearTimeout(state.timer)
+  state.timer = setTimeout(() => {
+    state.timer = undefined
+    const presets = [...state.presets.values()]
+    const base = presets.find((preset) => preset.id === 'liangshen')
+    void writeStatusAt(path, {
+      declared: presets.every((preset) => preset.declared),
+      peers: state.peers,
+      presets,
+      enabled: state.enabled,
+      ...(base === undefined ? {} : {
+        presetId: 'liangshen',
+        composition: base.composition,
+        broken: base.declared ? base.broken ?? null : null,
+        ...(base.error === undefined ? {} : { error: base.error }),
+      }),
+    })
+  }, 0)
 }
 
 /**
@@ -197,20 +244,35 @@ async function declareOne(ctx, registry, spec) {
  * @returns {Promise<object>} a diagnostic record for the status file
  */
 async function defaultSyncPeers() {
+  // Per-preset bundle rows call this once per row; rebuild the farm at most
+  // once per Host process. A failed rebuild is retried by the next row.
+  if (peerFarm !== undefined) return peerFarm
   try {
-    return syncPackagePeerFarm()
+    peerFarm = await syncPackagePeerFarm()
+    return peerFarm
   } catch (error) {
     return { synced: false, error: String(error?.message ?? error), linked: [], missing: [], changed: [] }
   }
 }
 
+/** Memoized peer-farm rebuild shared by every preset row in this process. */
+let peerFarm
+
 /**
  * Declare every bundled preset; one failure must not block the other.
  * @param {object} ctx Host context providing `agentPresets`
- * @param {{syncPeers?: () => Promise<object>, presets?: object}} [options]
+ * @param {{syncPeers?: () => Promise<object>, presets?: object, statusMode?: 'replace'|'merge'}} [options]
  */
 export async function declarePresets(ctx, options = {}) {
   const selection = normalizePresetSelection(options.presets)
+  const statusMode = options.statusMode ?? 'replace'
+  if (statusMode !== 'replace' && statusMode !== 'merge') {
+    throw new TypeError(`liangshen-anchored: statusMode must be "replace" or "merge"; got ${JSON.stringify(statusMode)}`)
+  }
+  const report = async (entry) => {
+    if (statusMode === 'merge') mergeStatus(entry)
+    else await writeStatus(entry)
+  }
   const syncPeers = options.syncPeers ?? defaultSyncPeers
   let peers
   try {
@@ -227,14 +289,14 @@ export async function declarePresets(ctx, options = {}) {
 
   const registry = ctx.get('agentPresets')
   if (registry === undefined || typeof registry.register !== 'function') {
-    await writeStatus({ declared: false, error: 'agentPresets service unavailable', presets: [], enabled: selection, peers })
+    await report({ declared: false, error: 'agentPresets service unavailable', presets: [], enabled: selection, peers })
     return
   }
   const enabled = PRESETS.filter((spec) => selection[spec.key] === true)
   const presets = []
   for (const spec of enabled) presets.push(await declareOne(ctx, registry, spec))
   const base = presets.find((preset) => preset.id === 'liangshen')
-  await writeStatus({
+  await report({
     declared: presets.every((preset) => preset.declared),
     peers,
     presets,
@@ -290,15 +352,19 @@ export function apply(ctx, config) {
   if (typeof source !== 'object' || Array.isArray(source)) {
     throw new TypeError('liangshen-anchored: config must be an object')
   }
-  const unknown = Object.keys(source).filter((key) => key !== 'presets')
+  const unknown = Object.keys(source).filter((key) => key !== 'presets' && key !== 'statusMode')
   if (unknown.length > 0) {
-    throw new TypeError(`liangshen-anchored: unknown config key(s) ${unknown.join(', ')} — allowed: presets`)
+    throw new TypeError(`liangshen-anchored: unknown config key(s) ${unknown.join(', ')} — allowed: presets, statusMode`)
+  }
+  const statusMode = source.statusMode ?? 'replace'
+  if (statusMode !== 'replace' && statusMode !== 'merge') {
+    throw new TypeError(`liangshen-anchored: statusMode must be "replace" or "merge"; got ${JSON.stringify(statusMode)}`)
   }
   const selection = normalizePresetSelection(source.presets)
   // The prompt-lab Host half (projection + hard-switch guard) is only useful
   // when the prompt-lab preset is declared; keep it off otherwise.
   if (selection.promptLab) installPromptLab(ctx)
-  const options = { presets: selection }
+  const options = { presets: selection, statusMode }
   if (ctx.get('agentPresets') !== undefined) {
     void declarePresets(ctx, options)
     return
