@@ -36,32 +36,18 @@ goal 确认门与 `/import` 是命令/监听器，不占工具面。
 
 ## 安装与配置
 
-> **2026-11-16 起，本机 web profile 使用拆分布局**：`dsh-liangshen-anchored` + 6 个功能 bundle 共 7 行，
-> 插件页逐个可开关；`@mosire/dshom` 仍保留为单 bundle 布局（二选一）。下面是单 bundle 布局的配置：
-
-profile 的 `dsh.profile.bundles` 里只加一行 `@mosire/dshom`（本机为 `link:` 到 `packages/dshom`）：
+profile 的 `dsh.profile.bundles` 里只列一行 `@mosire/dshom`（本机为 `link:` 到 `packages/dshom`）。
+插件页会显示 **9 个可独立开关的组件**（3 个预设 + 6 个功能），关闭组件由插件管理页写回 profile patch：
 
 ```yaml
-- id: dshom
-  name: '@mosire/dshom'
-  config:
-    features:            # 不写即全部 true
-      presets: true
-      goalConfirm: true
-      subagentAccess: true
-      jobTools: true
-      sessionImport: true
-      promptLabSession: true
-      sessionInspect: true
-    presets:             # 三个预设各自独立开关，不写即全部 true
-      liangshen: true
-      emptySystem: true
-      promptLab: true
+- id: preset-liangshen-empty-system
+  disabled: true
 ```
 
-装好后跑 `node tools/doctor.mjs` 检查 bundle 条目与 peer symlink 农场（`--fix` 可修复）。
-每个功能包和预设包也带自己的 `dsh.bundle.patch`，可以脱离 `@mosire/dshom` 单独安装（二选一，不要混用）；
-细分开关与独立子包清单见 [packages/dshom/README.md](packages/dshom/README.md)。
+装好后跑 `node tools/doctor.mjs` 检查 bundle 条目、组件包 link、peer symlink 农场与上次预设声明
+（doctor 同时支持「单 bundle 多组件」与「每个功能一个 bundle」两种布局）。
+每个功能包和预设包也带自己的 `dsh.bundle.patch`，可以脱离 dshom 单独安装（二选一，不要混用）；
+完整组件清单与独立子包说明见 [packages/dshom/README.md](packages/dshom/README.md)。
 预设的 `@deepseek-ai/*` peer 在每次 Host 激活时从运行中的 DSH 安装解析，因此不持久化安装路径。
 
 ## 验证
@@ -70,7 +56,7 @@ profile 的 `dsh.profile.bundles` 里只加一行 `@mosire/dshom`（本机为 `l
 cd packages && for d in dsh-liangshen-anchored dsh-goal-confirm dsh-subagent-access \
   dsh-job-tools dsh-session-import dsh-prompt-lab-session dsh-session-inspect dshom; do
   (cd "$d" && node --test test/*.test.mjs 2>&1 | grep -E '^# (pass|fail)'); done
-# 2026-11-15：122/53/32/18/28/12/14/5 全过（合计 284，0 fail）
+# 2026-11-16：129/53/32/19/28/12/14/15 全过（合计 302，0 fail）
 ```
 
 运行诊断：`~/.dsh/<feature>-status.json`（pid 应与目标 Host 一致）；预设声明看

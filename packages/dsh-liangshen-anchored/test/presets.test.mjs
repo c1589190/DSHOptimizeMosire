@@ -5,6 +5,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { declarePresets, normalizePresetSelection } from '../lib/index.js'
+import { name as entryLiangshen } from '../lib/entries/liangshen.js'
+import { name as entryEmpty } from '../lib/entries/empty-system.js'
+import { name as entryPromptLab } from '../lib/entries/prompt-lab.js'
 
 /** Fake agent-presets registry capturing declarations. */
 function makeRegistry({ broken = {}, fail = new Set() } = {}) {
@@ -154,4 +157,12 @@ test('per-preset bundle rows merge into one diagnostic file', async () => {
     else process.env.DSH_HOME = previous
     rmSync(home, { recursive: true, force: true })
   }
+})
+
+
+test('component entries expose distinct plugin names', () => {
+  assert.deepEqual(
+    [entryLiangshen, entryEmpty, entryPromptLab],
+    ['preset-liangshen', 'preset-liangshen-empty-system', 'preset-minimal-prompt-lab'],
+  )
 })

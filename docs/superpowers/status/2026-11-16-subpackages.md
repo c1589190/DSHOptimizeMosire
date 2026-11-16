@@ -83,6 +83,9 @@
 
 ## 2026-11-16 收尾：profile 切到 7-bundle 布局（用户反馈「不还是只有一个包」）
 
+> 本节是中间形态（7 个独立 bundle），已被下方「组件模式」取代；profile 已恢复为单 bundle。
+
+
 用户看到插件页「包含的组件 共 1 个」，指出代码拆包没有反映到**安装形态**。处理：
 
 - **预设 bundle patch 改为 3 行**：每行只声明一个预设（`config.presets` 子集 + `statusMode: merge`），
@@ -116,3 +119,37 @@
 - profile 的 7-bundle 改动是**本机环境**，不在 git 内；3080 必须重启才会在插件页看到 7 个条目 / 3 个预设组件。
 - 单 bundle 布局（`@mosire/dshom`）仍可用，配置开关见 dshom README；两种布局不要同时启用。
 - 预设 3 行的诊断文件是合并写入（下一个 tick），重启后 `liangshen-anchored-status.json` 应显示 3 个 `broken:null`。
+
+
+## 2026-11-16 组件模式：一个 dshom bundle + 9 个组件（用户澄清）
+
+用户贴出 `treg-dsh` 的插件页（一个包、组件列表 2 个）澄清：「整成类似其他插件的子包模式，类似于这个组件，不是分成多个插件。」
+也就是说：插件列表仍只有一个 `@mosire/dshom`，但要像 treg-dsh 那样在「包含的组件」里列出多个可独立开关的组件。
+
+### 改动
+
+- **撤回 7-bundle profile**：`~/.dsh/profiles/web/package.json` 的 `dsh.profile.bundles` 恢复为只列 `@mosire/dshom`；
+  7 个组件包保留为 dependencies / node_modules link（组件行需要从 profile 解析）。
+- **dshom patch 改 9 行组件**：3 个预设 + 6 个功能，删除旧的 `id: dshom` 单行 apply。
+- **预设包新增组件子入口**：`./presets/liangshen`、`./presets/empty-system`、`./presets/prompt-lab`，
+  各自 `export const name` 不同，`apply` 只声明一个预设并 `statusMode: merge`。
+- 组件开关 = 插件管理页写回 profile patch 的 `- id: <component> disabled: true`（已用行关闭 E2E 验证）。
+- `@mosire/dshom/index.js` 的 `apply` 保留给手动单行模式；默认组件布局不再使用 `config.features` / `config.presets`。
+
+### 验证
+
+- `dsh --profile web --dump-config`：`@mosire/dshom` 下正好 **9 行组件**，profile 仅 dshom 一个 @mosire bundle。
+- 3099 真实 E2E：
+  - 预设列表含本仓 3 个、`broken:null`；GUI「创建→切 liangshen」首请求仍 `["bash","str_replace_editor"]`、零注入，
+    晋升后 feature 工具齐全；
+  - profile patch `- id: preset-liangshen-empty-system disabled: true` → 本仓预设剩 `liangshen` + `minimal-prompt-lab`；
+  - `node tools/doctor.mjs` → OK（dshom 布局）。
+- 单测 **302/302**（dshom 15 条、preset 129 条）。
+- 证据：`.superpowers/sdd/2026-11-16-preset-switch-anchor/evidence/verify-switch.json`、
+  `.superpowers/sdd/2026-11-16-subpackages/evidence/verify-preset-switch.json`。
+
+### 注意
+
+- profile 的 bundles/deps 是本机环境改动，不在 git 内；3080 重启后插件页应显示 **1 个 dshom 条目 + 9 个组件**。
+- 组件包没有装进 profile 时，对应组件行会解析失败；`tools/doctor.mjs` 在 dshom 布局下会检查 9 个包的 link。
+- 旧 7-bundle 布局仍可手动使用（各包自带 patch），但 profile 已不再采用，二选一。

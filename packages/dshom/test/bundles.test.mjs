@@ -51,3 +51,21 @@ test('@mosire/dshom remains the only all-in-one entry', () => {
   const manifest = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
   assert.equal(manifest.dsh.bundle.patch, './cordis.patch.yml')
 })
+
+
+test('@mosire/dshom mounts nine independently switchable components', () => {
+  const patch = readFileSync(new URL('../cordis.patch.yml', import.meta.url), 'utf8')
+  const names = [
+    '@mosire/dsh-liangshen-anchored/presets/liangshen',
+    '@mosire/dsh-liangshen-anchored/presets/empty-system',
+    '@mosire/dsh-liangshen-anchored/presets/prompt-lab',
+    '@mosire/dsh-goal-confirm',
+    '@mosire/dsh-subagent-access',
+    '@mosire/dsh-job-tools',
+    '@mosire/dsh-session-import',
+    '@mosire/dsh-prompt-lab-session',
+    '@mosire/dsh-session-inspect',
+  ]
+  for (const name of names) assert.ok(patch.includes(`name: '${name}'`), name)
+  assert.equal((patch.match(/^    - id:/gmu) ?? []).length, 9)
+})

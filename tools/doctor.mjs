@@ -111,11 +111,24 @@ if (splitMode) {
   const missing = SPLIT_BUNDLES.filter((name) => !bundles.includes(name))
   if (missing.length > 0) notes.push(`split layout omits (disabled): ${missing.join(', ')}`)
 } else if (dshomListed) {
-  // All-in-one layout: the umbrella must stay installed and listed.
+  // Component layout: the umbrella must stay installed and listed, and every
+  // component row in its patch must resolve from the profile's node_modules.
   if (dependencies['@mosire/dshom'] === undefined) {
     problems.push('@mosire/dshom is missing from profile dependencies (run: dsh plugin --profile ' + profile + ' add @mosire/dshom)')
   }
   checkBundle('@mosire/dshom')
+  const umbrellaPatch = join(profileDir, 'node_modules', '@mosire', 'dshom', 'cordis.patch.yml')
+  if (existsSync(umbrellaPatch)) {
+    const text = readFileSync(umbrellaPatch, 'utf8')
+    const components = [...text.matchAll(/^\s+name:\s+'([^']+)'\s*$/gmu)].map((match) => match[1])
+    for (const name of new Set(components)) {
+      const root = name.startsWith('@') ? name.split('/').slice(0, 2).join('/') : name.split('/')[0]
+      const short = root.split('/')[1]
+      const dir = join(profileDir, 'node_modules', '@mosire', short)
+      if (!existsSync(dir)) problems.push(`dshom component package is not linked at ${dir} (row: ${name})`)
+    }
+    notes.push(`dshom components: ${new Set(components).size}`)
+  }
 }
 
 const names = requiredPeerNames(presetRoot)

@@ -62,8 +62,9 @@
     `@mosire/dsh-session-inspect`，由 `@mosire/dshom` 的 `features.sessionInspect` 启用。裁定见 D-031。
 - **交付形态（2026-10-19，D-020）**：以上功能统一由**单一 bundle `@mosire/dshom`** 提供（Host 入口按特性调用各实现模块；
   **2026-11-10 D-033 起为 Host-only**，client half 已删除）；旧 `@mosire/dsh-*` 包保留为实现/测试模块，profile 只启用 `dshom`。
-  **2026-11-16 起**：每个功能包也带自己的 `dsh.bundle.patch`（可脱离 dshom 单独安装，二选一、勿混用），
-  功能用 `config.features`、预设用 `config.presets` 独立开关；见 `docs/superpowers/status/2026-11-16-subpackages.md`。
+  **2026-11-16 起**：`@mosire/dshom` 是一个 bundle + **9 个可独立开关组件**（3 个预设子入口 + 6 个功能），
+  组件开关由插件页写回 profile patch；每个功能包也带自己的 `dsh.bundle.patch`（可脱离 dshom 单独安装，二选一、勿混用）。
+  `config.features` / `config.presets` 仅保留给手动单行模式；见 `docs/superpowers/status/2026-11-16-subpackages.md`。
 - 权威顺序：**用户原话 > 最新落盘文档 > 本文件 > `docs/agents/*.md` 长文 > 上游参考（DSH / TUI / dsh-web 的源码与 README）> 旧文档**。
 - 「当前状态」不抄在本文件：看 `docs/superpowers/status/` 最新一份 + `git log --oneline`。
 
@@ -139,7 +140,7 @@
 - `docs/superpowers/status/2026-11-15-subagent-model-selection-key.md` —— 2026-11-15 修复梁神预设 DSH 0.2.2 旧键（`modelSelection` + `modelDiscovery`）与首轮 `subagent:identity` 泄漏（required context 空 shadow）；单测/3099 验证、3080 重启要求。
 - `docs/superpowers/status/2026-11-15-plugin-inventory.md` —— 2026-11-15 插件实际形态盘点：9 包 / 3 预设 / 6 组常驻能力、装载拓扑、11 个工具面实测与 284 单测；含「根 README 过期描述已修」记录。
 - `docs/superpowers/status/2026-11-16-preset-switch-anchor.md` —— 2026-11-16 修复 GUI「创建后切预设」时锚定不生效（tool-bootstrap/context-gate 晚加入补建 + dshom tool-gate 用生效预设）；单测 125/125 + 6/6、3099 真实 E2E 首请求 2 工具。
-- `docs/superpowers/status/2026-11-16-subpackages.md` —— 2026-11-16 子包化：6 个功能包补独立 bundle patch、独立安装时自建 gate + `inject` 等 service；预设加 `config.presets` 三开关；收尾把本机 profile 切成 7-bundle 布局、预设 bundle patch 拆 3 行、doctor 支持双布局；单测 300/300、3099 E2E（默认流程/行级关闭/独立组合）全绿（**最新状态**）。
+- `docs/superpowers/status/2026-11-16-subpackages.md` —— 2026-11-16 子包化：6 个功能包补独立 bundle patch、独立安装时自建 gate + `inject`；最终按用户澄清改为**一个 dshom bundle + 9 个可开关组件**（3 预设子入口 + 6 功能），doctor 支持双布局；单测 302/302、3099 E2E（默认流程/组件关闭/独立组合）全绿（**最新状态**）。
 
 ## 五、交叉纪律要点（每条只是概述 + 指针）
 

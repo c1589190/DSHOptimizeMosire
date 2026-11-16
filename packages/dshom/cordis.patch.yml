@@ -1,5 +1,22 @@
-# One bundle for the whole dshom feature set. The Host entry composes the
-# feature modules below; the Client entry is the chat timing annotation UI.
+# One bundle, nine independently switchable components. The plugin page lists
+# every row below; toggling one writes a `disabled` row to the profile patch.
+# Rows resolve from the profile's node_modules (@mosire/* packages).
 - insert:
-    - id: dshom
-      name: '@mosire/dshom'
+    - id: preset-liangshen
+      name: '@mosire/dsh-liangshen-anchored/presets/liangshen'
+    - id: preset-liangshen-empty-system
+      name: '@mosire/dsh-liangshen-anchored/presets/empty-system'
+    - id: preset-minimal-prompt-lab
+      name: '@mosire/dsh-liangshen-anchored/presets/prompt-lab'
+    - id: goal-confirm
+      name: '@mosire/dsh-goal-confirm'
+    - id: subagent-access
+      name: '@mosire/dsh-subagent-access'
+    - id: job-tools
+      name: '@mosire/dsh-job-tools'
+    - id: session-import
+      name: '@mosire/dsh-session-import'
+    - id: prompt-lab-session
+      name: '@mosire/dsh-prompt-lab-session'
+    - id: session-inspect
+      name: '@mosire/dsh-session-inspect'

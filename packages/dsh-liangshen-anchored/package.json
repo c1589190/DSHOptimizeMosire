@@ -8,7 +8,10 @@
     ".": "./lib/index.js",
     "./package.json": "./package.json",
     "./locale/*.json": "./locale/*.json",
-    "./icon.svg": "./icon.svg"
+    "./icon.svg": "./icon.svg",
+    "./presets/liangshen": "./lib/entries/liangshen.js",
+    "./presets/empty-system": "./lib/entries/empty-system.js",
+    "./presets/prompt-lab": "./lib/entries/prompt-lab.js"
   },
   "peerDependencies": {
     "@deepseek-ai/dsh": ">=0.2.0-rc.2"
