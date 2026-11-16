@@ -1,0 +1,6 @@
+# Standalone bundle for prompt_lab_workspaces / prompt_lab_session. Enable this
+# package directly (instead of @mosire/dshom); its apply() builds its own
+# anchor gate when no shared gate is supplied.
+- insert:
+    - id: prompt-lab-session
+      name: '@mosire/dsh-prompt-lab-session'

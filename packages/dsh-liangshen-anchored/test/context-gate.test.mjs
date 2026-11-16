@@ -36,6 +36,8 @@ function mount() {
     session: { id: 's-required-contexts', header: { delegationDepth: 0 }, snapshotEvents: () => [] },
     ctx: { systemPrompt },
   }
+  const agents = { get: (id) => (id === agent.session.id ? agent : undefined) }
+  ctx.get = (name) => (name === 'agents' ? agents : undefined)
   applyGate(ctx, {})
   return { listeners, registered, agent }
 }
@@ -57,4 +59,16 @@ test('the unpromoted gate shadows the required subagent identity context', () =>
   assert.equal(identity.text, '')
   assert.equal(identity.required, true)
   assert.equal(identity.order, 650)
+})
+
+test('a preset selected after agent creation still gates the first request', () => {
+  const { listeners, registered, agent } = mount()
+  listeners.get('session/event')[0](agent.session, {
+    type: 'agent-preset/selected',
+    seq: 1,
+    data: { agentPreset: 'liangshen' },
+  })
+  const workingDirectory = registered.find((entry) => entry.name === 'working-directory:current')
+  assert.ok(workingDirectory, 'the late join must register the suppression before the next assembly')
+  assert.equal(workingDirectory.text, '')
 })

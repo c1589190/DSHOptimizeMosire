@@ -388,7 +388,7 @@ test('apply installs the three tools on top-level agents only', async () => {
     assert.equal(subTools.length, 0)
     assert.equal(handlers.has('agent/created'), true)
     assert.equal(handlers.has('agent/disposed'), true)
-    assert.equal(effects.length, 1)
+    assert.ok(effects.length >= 1, 'the tool disposer is registered as an effect')
     const status = JSON.parse(await readFile(join(home, 'session-inspect-status.json'), 'utf8'))
     assert.deepEqual(status.tools, [LIST_TOOL_NAME, READ_TOOL_NAME, FIND_TOOL_NAME])
     assert.deepEqual(status.installed, ['session-a'])

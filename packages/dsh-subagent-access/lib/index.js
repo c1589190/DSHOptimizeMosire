@@ -42,6 +42,7 @@ import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 
 import { TOOL_NAMES, catalogRows, normalizeConfig, shouldInstall } from './catalog.js'
+import { createToolGate } from '../../dshom/tool-gate.js'
 
 /**
  * Cross-bundle anchored bootstrap gate (see the anchored preset's
@@ -433,6 +434,9 @@ export function apply(ctx, config, gate) {
 
   /** One entry per Agent scope currently receiving the tools. @type {Map<object, () => void>} */
   const installed = new Map()
+  // A standalone bundle row supplies no gate; build one so the anchored
+  // presets still keep this tool group out of their first request.
+  let toolGate = gate
 
   /** Warn through the Host logger without letting logging failures escape. */
   function warn(message) {
@@ -489,7 +493,8 @@ export function apply(ctx, config, gate) {
     }
     try {
       const mount = () => install(ctx, agent, agents, subagents)
-      installed.set(agent, gate === undefined ? mount() : gate.mount(agent, mount))
+      if (toolGate === undefined) toolGate = createToolGate(ctx)
+      installed.set(agent, toolGate.mount(agent, mount))
       writeStatus()
     } catch (error) {
       warn(`could not install tools for agent "${agentId(agent) ?? 'unknown'}": ${String(error?.message ?? error)}`)

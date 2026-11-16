@@ -165,6 +165,33 @@ export function apply(ctx, config) {
   /** session id -> { agent, releases } */
   const phases = new Map()
 
+  /**
+   * Resolve a live Agent for a session that joined this preset AFTER its Agent
+   * was created. The Web client stages the new-session preset chip and applies
+   * it through `AgentPresets.select` before the first turn; that path emits
+   * `agent-preset/selected` but never `agent/created`, so the suppression
+   * installed on `agent/created` alone would miss the gated first request.
+   */
+  const lookupAgent = (session) => {
+    try {
+      const agents = typeof ctx.get === 'function' ? ctx.get('agents') : undefined
+      return agents?.get?.(session.id)
+    } catch {
+      return undefined
+    }
+  }
+
+  /** Create the phase for a late-joined session on its first observed event. */
+  const ensurePhase = (session) => {
+    const known = phases.get(session.id)
+    if (known !== undefined) return known
+    const agent = lookupAgent(session)
+    if (agent?.session === undefined) return undefined
+    const entry = { agent, releases: [] }
+    phases.set(session.id, entry)
+    return entry
+  }
+
   const releaseContextGate = (entry) => {
     const releases = entry.releases
     entry.releases = []
@@ -269,7 +296,9 @@ export function apply(ctx, config) {
 
   ctx.on('session/event', (session, event) => {
     promotion.observe(session, event)
-    const entry = phases.get(session.id)
+    // A preset selected before the first turn joins late: initialize here so
+    // the suppression is registered before the next assembly.
+    const entry = ensurePhase(session)
     if (entry === undefined) return
     try {
       syncContextGate(entry.agent)

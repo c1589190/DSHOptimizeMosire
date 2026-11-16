@@ -150,9 +150,9 @@ test('activation installs the four tools in root scopes only and records status'
 
   assert.deepEqual([...root.tools.keys()], ['subagent_list', 'subagent_message', 'subagent_interrupt', 'subagent_wait'])
   assert.equal(child.tools.size, 0, 'a delegated scope is not a default target')
-  assert.deepEqual(ctx.onCalls.map((call) => call.event), ['agent/created', 'agent/disposed'])
-  assert.equal(ctx.effects.length, 1)
-  assert.equal(ctx.effects[0].label, 'subagent-access.scopedTools()')
+  assert.deepEqual(ctx.onCalls.map((call) => call.event), ['session/event', 'agent/created', 'agent/disposed'])
+  assert.ok(ctx.effects.length >= 1, 'the tool disposer is registered as an effect')
+  assert.ok(ctx.effects.some((effect) => effect.label === 'subagent-access.scopedTools()'))
 
   const status = readStatus()
   assert.equal(status.activated, true)

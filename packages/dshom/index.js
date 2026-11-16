@@ -50,7 +50,7 @@ export function apply(ctx, config = {}) {
   // tool group until the first durable promotion signal.
   const toolGate = createToolGate(ctx)
 
-  if (features.presets !== false) applyLiangshen(ctx)
+  if (features.presets !== false) applyLiangshen(ctx, { presets: source.presets })
   if (features.goalConfirm !== false) applyGoalConfirm(ctx, source.goalConfirm ?? {})
   if (features.subagentAccess !== false) {
     const subagentConfig = source.subagentAccess ?? {}

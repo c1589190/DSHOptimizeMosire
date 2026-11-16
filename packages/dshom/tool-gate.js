@@ -65,6 +65,27 @@ export function createToolGate(ctx, options = {}) {
     return entry
   }
 
+  /**
+   * Effective preset of a live session: the creation header overridden by the
+   * latest `agent-preset/selected`. The Web client creates a session on the
+   * deployment default and applies the staged preset chip before the first
+   * turn, so the header alone is stale for exactly the sessions that need the
+   * gate.
+   */
+  const effectivePreset = (session) => {
+    let preset = session.header?.agentPreset
+    for (const event of eventsOf(session)) {
+      if (event.type === 'agent-preset/selected' && typeof event.data?.agentPreset === 'string') {
+        preset = event.data.agentPreset
+      }
+    }
+    return preset
+  }
+
+  /** Whether a session must keep the feature tool groups unmounted pre-promotion. */
+  const isDeferrable = (session) => presets.has(effectivePreset(session))
+    && (session.header?.delegationDepth ?? 0) === 0
+
   const disposeSlot = (slot) => {
     const dispose = slot.dispose
     slot.dispose = undefined
@@ -98,7 +119,7 @@ export function createToolGate(ctx, options = {}) {
         return typeof dispose === 'function' ? dispose : () => {}
       }
       const entry = stateFor(session)
-      const deferrable = presets.has(session.header?.agentPreset) && (session.header?.delegationDepth ?? 0) === 0
+      const deferrable = isDeferrable(session)
       const slot = { mount, dispose: undefined, released: false, deferrable }
       if (!deferrable || entry.promoted) {
         // Immediate mount errors propagate to the caller's own try/catch.
@@ -119,6 +140,18 @@ export function createToolGate(ctx, options = {}) {
     const entry = sessions.get(session.id)
     if (entry === undefined) return
     const seq = event.seq ?? 0
+    if (event.type === 'agent-preset/selected') {
+      // A session created on the deployment default joins this preset before
+      // its first turn. Re-evaluate its slots so the anchored first request
+      // does not carry the feature tools after the switch.
+      const deferrable = isDeferrable(session)
+      for (const slot of entry.slots) {
+        slot.deferrable = deferrable
+        if (deferrable && !entry.promoted) disposeSlot(slot)
+        else mountSlot(slot)
+      }
+      return
+    }
     if (event.type === 'compaction/end') {
       entry.boundary = seq
       entry.promoted = false

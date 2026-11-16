@@ -13,6 +13,9 @@ import { importArchive } from './import.js'
 /** Cordis plugin name used by loader diagnostics. */
 export const name = 'session-import'
 
+/** Standalone bundle rows wait for the command/persistence services. */
+export const inject = ['commands', 'sessionPersistence']
+
 /** Slash command name, without the leading slash. */
 export const COMMAND_NAME = 'import'
 

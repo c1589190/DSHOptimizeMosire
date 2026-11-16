@@ -107,3 +107,27 @@ test('subagents keep their full catalog', () => {
   })
   assert.equal(mounts, 1)
 })
+
+test('a preset selected before the first turn defers the group', () => {
+  const ctx = fakeCtx()
+  const gate = createToolGate(ctx)
+  const events = []
+  const s = session('s6', 'standard', events)
+  let mounts = 0
+  let disposes = 0
+  gate.mount({ session: s }, () => {
+    mounts += 1
+    return () => {
+      disposes += 1
+    }
+  })
+  assert.deepEqual([mounts, disposes], [1, 0], 'a standard session mounts at once')
+
+  const selected = { type: 'agent-preset/selected', seq: 1, data: { agentPreset: 'liangshen' } }
+  events.push(selected)
+  ctx.emit('session/event', s, selected)
+  assert.deepEqual([mounts, disposes], [1, 1], 'joining the anchored preset releases the group')
+
+  ctx.emit('session/event', s, { type: 'tool/call', seq: 2 })
+  assert.deepEqual([mounts, disposes], [2, 1], 'promotion mounts the group again')
+})

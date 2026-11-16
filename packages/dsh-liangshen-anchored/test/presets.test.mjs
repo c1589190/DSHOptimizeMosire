@@ -4,7 +4,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { declarePresets } from '../lib/index.js'
+import { declarePresets, normalizePresetSelection } from '../lib/index.js'
 
 /** Fake agent-presets registry capturing declarations. */
 function makeRegistry({ broken = {}, fail = new Set() } = {}) {
@@ -37,12 +37,12 @@ async function fakeSyncPeers() {
 }
 
 /** Run declarePresets with DSH_HOME isolated to a temp dir; return the status file. */
-async function declare(registry) {
+async function declare(registry, options = {}) {
   const home = mkdtempSync(join(tmpdir(), 'dshom-presets-'))
   const previous = process.env.DSH_HOME
   process.env.DSH_HOME = home
   try {
-    await declarePresets(makeCtx(registry), { syncPeers: fakeSyncPeers })
+    await declarePresets(makeCtx(registry), { syncPeers: fakeSyncPeers, ...options })
     return JSON.parse(readFileSync(join(home, 'liangshen-anchored-status.json'), 'utf8'))
   } finally {
     if (previous === undefined) delete process.env.DSH_HOME
@@ -111,4 +111,19 @@ test('a missing agent-presets service fails open and is recorded', async () => {
   assert.equal(status.declared, false)
   assert.match(status.error, /agentPresets service unavailable/u)
   assert.deepEqual(status.presets, [])
+})
+
+test('config.presets switches one or more bundled presets off', async () => {
+  const registry = makeRegistry()
+  const status = await declare(registry, { presets: { emptySystem: false, promptLab: false } })
+  assert.deepEqual(registry.calls.map((definition) => definition.id), ['liangshen'])
+  assert.deepEqual(status.enabled, { liangshen: true, emptySystem: false, promptLab: false })
+  assert.equal(status.presets.length, 1)
+  assert.equal(status.declared, true)
+})
+
+test('config.presets rejects unknown keys and non-boolean values', () => {
+  assert.throws(() => normalizePresetSelection({ empty: false }), /unknown presets key/u)
+  assert.throws(() => normalizePresetSelection({ emptySystem: 'no' }), /must be a boolean/u)
+  assert.throws(() => normalizePresetSelection([]), /presets must be an object/u)
 })

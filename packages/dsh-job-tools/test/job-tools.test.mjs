@@ -261,3 +261,62 @@ test('normalizeConfig rejects an inverted timeout window', () => {
     /defaultTimeoutSeconds/u,
   )
 })
+
+test('a standalone bundle builds a gate and defers for an anchored preset', () => {
+  const home = mkdtempSync(join(tmpdir(), 'dshom-job-tools-gate-'))
+  const previous = process.env.DSH_HOME
+  process.env.DSH_HOME = home
+  try {
+    const events = []
+    const registered = []
+    const agent = {
+      id: 'session-anchored',
+      session: {
+        id: 'session-anchored',
+        header: { agentPreset: 'liangshen', delegationDepth: 0 },
+        snapshotEvents: () => events,
+      },
+      ctx: {
+        tools: {
+          register(definition) {
+            registered.push(definition)
+            return () => {}
+          },
+        },
+      },
+    }
+    const { jobs } = makeJobs()
+    const handlers = new Map()
+    const ctx = {
+      get(key) {
+        if (key === 'agents') return { list: () => [agent] }
+        if (key === 'jobs') return jobs
+        return undefined
+      },
+      on(event, handler) {
+        const list = handlers.get(event) ?? []
+        list.push(handler)
+        handlers.set(event, list)
+        return () => {}
+      },
+      effect() {
+        return () => {}
+      },
+      logger: { warn() {} },
+      emit(event, ...args) {
+        for (const handler of handlers.get(event) ?? []) handler(...args)
+      },
+    }
+    apply(ctx, {})
+    assert.equal(registered.length, 0, 'the anchored first request must not see the job tools')
+
+    const call = { type: 'tool/call', seq: 1 }
+    events.push(call)
+    ctx.emit('session/event', agent.session, call)
+    assert.deepEqual(registered.map((tool) => tool.name).sort(), ['job_read', 'job_wait'])
+  } finally {
+    if (previous === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = previous
+    rmSync(home, { recursive: true, force: true })
+  }
+})

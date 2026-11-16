@@ -1,0 +1,6 @@
+# Standalone bundle for the background-job tools. Enable this package directly
+# (instead of @mosire/dshom) to mount only job_wait / job_read; its apply()
+# builds its own anchor gate when no shared gate is supplied.
+- insert:
+    - id: job-tools
+      name: '@mosire/dsh-job-tools'

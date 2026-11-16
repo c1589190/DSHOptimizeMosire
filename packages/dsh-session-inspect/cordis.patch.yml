@@ -1,0 +1,6 @@
+# Standalone bundle for session_list / session_read / session_find. Enable this
+# package directly (instead of @mosire/dshom); its apply() builds its own
+# anchor gate when no shared gate is supplied.
+- insert:
+    - id: session-inspect
+      name: '@mosire/dsh-session-inspect'

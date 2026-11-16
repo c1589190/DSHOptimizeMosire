@@ -24,6 +24,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
+import { createToolGate } from '../../dshom/tool-gate.js'
 
 /**
  * Cross-bundle anchored bootstrap gate (see the anchored preset's
@@ -36,6 +37,9 @@ import { dirname, join } from 'node:path'
 
 /** Cordis plugin name used by loader diagnostics. */
 export const name = 'session-inspect'
+
+/** Standalone bundle rows wait for the Agent/session-query services. */
+export const inject = ['agents', 'sessionQuery']
 
 /** Model-facing tool name that lists sessions. */
 export const LIST_TOOL_NAME = 'session_list'
@@ -795,6 +799,9 @@ export function apply(ctx, config = {}, gate) {
   const cfg = normalizeConfig(config)
   /** @type {Map<object, Array<() => void>>} */
   const installed = new Map()
+  // A standalone bundle row supplies no gate; build one so the anchored
+  // presets still keep this tool group out of their first request.
+  let toolGate = gate
 
   const warn = (message) => {
     try {
@@ -876,7 +883,8 @@ export function apply(ctx, config = {}, gate) {
       }
     }
     try {
-      installed.set(agent, gate === undefined ? mount() : gate.mount(agent, mount))
+      if (toolGate === undefined) toolGate = createToolGate(ctx)
+      installed.set(agent, toolGate.mount(agent, mount))
       writeStatus()
     } catch (error) {
       warn(`failed to install tools on agent "${agentId(agent) ?? 'unknown'}": ${error instanceof Error ? error.message : String(error)}`)

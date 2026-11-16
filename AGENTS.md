@@ -62,6 +62,8 @@
     `@mosire/dsh-session-inspect`，由 `@mosire/dshom` 的 `features.sessionInspect` 启用。裁定见 D-031。
 - **交付形态（2026-10-19，D-020）**：以上功能统一由**单一 bundle `@mosire/dshom`** 提供（Host 入口按特性调用各实现模块；
   **2026-11-10 D-033 起为 Host-only**，client half 已删除）；旧 `@mosire/dsh-*` 包保留为实现/测试模块，profile 只启用 `dshom`。
+  **2026-11-16 起**：每个功能包也带自己的 `dsh.bundle.patch`（可脱离 dshom 单独安装，二选一、勿混用），
+  功能用 `config.features`、预设用 `config.presets` 独立开关；见 `docs/superpowers/status/2026-11-16-subpackages.md`。
 - 权威顺序：**用户原话 > 最新落盘文档 > 本文件 > `docs/agents/*.md` 长文 > 上游参考（DSH / TUI / dsh-web 的源码与 README）> 旧文档**。
 - 「当前状态」不抄在本文件：看 `docs/superpowers/status/` 最新一份 + `git log --oneline`。
 
@@ -134,7 +136,10 @@
 - `docs/superpowers/status/2026-11-04-session-inspect.md` —— 功能十一：`session_list` / `session_read` / `session_find` 只读工具、surface/raw/event 三模式、单测 14/14、实机 18/18、待重启 3080。
 - `docs/superpowers/status/2026-11-05-dsh-0.2.2-upgrade.md` —— 2026-11-05 DSH 0.2.2 适配：子路径守卫、`tools.restrict`/`suppressRuntimeContext` 路径、dshom 通用工具组门、实机 12/12。
 - `docs/superpowers/status/2026-11-10-remove-chat-timing-client.md` —— 2026-11-10 移除 dshom 客户端 half（时间标注 + dock goal 开关）、Host-only 安装、liangshen 3099 E2E 12/12。
-- `docs/superpowers/status/2026-11-15-subagent-model-selection-key.md` —— 2026-11-15 修复梁神预设 DSH 0.2.2 旧键（`modelSelection` + `modelDiscovery`）与首轮 `subagent:identity` 泄漏（required context 空 shadow）；单测/3099 验证、3080 重启要求（**最新状态**）。
+- `docs/superpowers/status/2026-11-15-subagent-model-selection-key.md` —— 2026-11-15 修复梁神预设 DSH 0.2.2 旧键（`modelSelection` + `modelDiscovery`）与首轮 `subagent:identity` 泄漏（required context 空 shadow）；单测/3099 验证、3080 重启要求。
+- `docs/superpowers/status/2026-11-15-plugin-inventory.md` —— 2026-11-15 插件实际形态盘点：9 包 / 3 预设 / 6 组常驻能力、装载拓扑、11 个工具面实测与 284 单测；含「根 README 过期描述已修」记录。
+- `docs/superpowers/status/2026-11-16-preset-switch-anchor.md` —— 2026-11-16 修复 GUI「创建后切预设」时锚定不生效（tool-bootstrap/context-gate 晚加入补建 + dshom tool-gate 用生效预设）；单测 125/125 + 6/6、3099 真实 E2E 首请求 2 工具。
+- `docs/superpowers/status/2026-11-16-subpackages.md` —— 2026-11-16 子包化：6 个功能包补独立 bundle patch、独立安装时自建 gate + `inject` 等 service；预设加 `config.presets` 三开关；单测 299/299、3099 三条 E2E（默认流程/预设开关/独立 bundle 组合）全绿（**最新状态**）。
 
 ## 五、交叉纪律要点（每条只是概述 + 指针）
 

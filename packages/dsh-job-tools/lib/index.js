@@ -26,6 +26,7 @@ import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 
 import { OPTIMIZE_DEFAULTS, optimizeJobOutput } from './optimize.js'
+import { createToolGate } from '../../dshom/tool-gate.js'
 
 /**
  * Cross-bundle anchored bootstrap gate (see the anchored preset's
@@ -38,6 +39,9 @@ import { OPTIMIZE_DEFAULTS, optimizeJobOutput } from './optimize.js'
 
 /** Cordis plugin name used by loader diagnostics. */
 export const name = 'job-tools'
+
+/** Standalone bundle rows wait for the Agent/job services to exist. */
+export const inject = ['agents', 'jobs']
 
 /** Diagnostic file under `$DSH_HOME`. */
 const STATUS_FILE = 'job-tools-status.json'
@@ -352,6 +356,9 @@ export function apply(ctx, config = {}, gate) {
   const cfg = normalizeConfig(config)
   /** @type {Map<object, () => void>} */
   const installed = new Map()
+  // A standalone bundle row supplies no gate; build one so the anchored
+  // presets still keep this tool group out of their first request.
+  let toolGate = gate
 
   const warn = (message) => {
     try {
@@ -404,7 +411,8 @@ export function apply(ctx, config = {}, gate) {
     }
     try {
       const mount = () => installTools(agent, jobs, cfg)
-      installed.set(agent, gate === undefined ? mount() : gate.mount(agent, mount))
+      if (toolGate === undefined) toolGate = createToolGate(ctx)
+      installed.set(agent, toolGate.mount(agent, mount))
       writeStatus()
     } catch (error) {
       warn(`could not install job tools for agent "${agentId(agent) ?? 'unknown'}": ${String(error?.message ?? error)}`)

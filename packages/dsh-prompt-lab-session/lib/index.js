@@ -29,6 +29,7 @@ import { homedir } from 'node:os'
 import { dirname, isAbsolute, join, resolve } from 'node:path'
 
 import { readPromptFile, sha256 } from '../../dsh-liangshen-anchored/lib/prompt-lab-state.js'
+import { createToolGate } from '../../dshom/tool-gate.js'
 
 /**
  * Cross-bundle anchored bootstrap gate (see the anchored preset's
@@ -41,6 +42,9 @@ import { readPromptFile, sha256 } from '../../dsh-liangshen-anchored/lib/prompt-
 
 /** Cordis plugin name used by loader diagnostics. */
 export const name = 'prompt-lab-session'
+
+/** Standalone bundle rows wait for the session/command/workspace services. */
+export const inject = ['agents', 'sessionController', 'commands', 'workspaceRegistry']
 
 /** Model-facing tool name that creates a session. */
 export const TOOL_NAME = 'prompt_lab_session'
@@ -561,6 +565,9 @@ export function apply(ctx, config = {}, gate) {
   const cfg = normalizeConfig(config)
   /** @type {Map<object, Array<() => void>>} */
   const installed = new Map()
+  // A standalone bundle row supplies no gate; build one so the anchored
+  // presets still keep this tool group out of their first request.
+  let toolGate = gate
 
   const warn = (message) => {
     try {
@@ -645,7 +652,8 @@ export function apply(ctx, config = {}, gate) {
       }
     }
     try {
-      installed.set(agent, gate === undefined ? mount() : gate.mount(agent, mount))
+      if (toolGate === undefined) toolGate = createToolGate(ctx)
+      installed.set(agent, toolGate.mount(agent, mount))
       writeStatus()
     } catch (error) {
       warn(`could not install prompt-lab tools for agent "${agentId(agent) ?? 'unknown'}": ${String(error?.message ?? error)}`)

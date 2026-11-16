@@ -67,6 +67,22 @@ node tools/doctor.mjs
 
 装完新开会话，在预设选择器里选「梁神模式」「梁神模式·空系统提示词」或「极简模式·提示词实验」。
 
+### 独立开关预设
+
+bundle 行接受 `config.presets`（键名 `liangshen` / `emptySystem` / `promptLab`，缺省全 `true`）：
+
+```yaml
+- id: liangshen-anchored
+  name: '@mosire/dsh-liangshen-anchored'
+  config:
+    presets:
+      emptySystem: false
+      promptLab: false
+```
+
+经 `@mosire/dshom` 启用时写在 dshom 的 `config.presets` 下，效果相同。
+未知键或非布尔值在激活时直接报错；关闭 `promptLab` 时其 Host half（`prompt-lab` 投影 + 切换守卫）也不会安装。
+
 > 为什么要 symlink：组合 YAML 由 `@deepseek-ai/cordis-plugin-include` 从包内目录加载，
 > 其中的 `@deepseek-ai/*` 裸包名由 Node 从该目录向上找 `node_modules`；workspace 包没有自己的依赖树，
 > 故用 symlink 指向 DSH 安装（realpath 相同，与宿主共享同一模块实例）。

@@ -58,6 +58,7 @@ const PROMPT_LAB_ROOT = new URL('../presets/minimal-prompt-lab/', import.meta.ur
 const PRESETS = [
   {
     id: 'liangshen',
+    key: 'liangshen',
     metadata: 'preset.yml',
     composition: 'agent.cordis.yml',
     fallback: {
@@ -68,6 +69,7 @@ const PRESETS = [
   },
   {
     id: 'liangshen-empty-system',
+    key: 'emptySystem',
     metadata: 'preset.empty-system.yml',
     composition: 'agent.empty-system.cordis.yml',
     fallback: {
@@ -78,6 +80,7 @@ const PRESETS = [
   },
   {
     id: 'minimal-prompt-lab',
+    key: 'promptLab',
     root: PROMPT_LAB_ROOT,
     metadata: 'preset.yml',
     composition: 'agent.cordis.yml',
@@ -88,6 +91,34 @@ const PRESETS = [
     },
   },
 ]
+
+/**
+ * `config.presets` switches: every bundled preset is declared unless its key is
+ * explicitly `false`. Rejecting unknown keys and non-booleans keeps a typo in
+ * the profile patch visible at activation instead of silently dropping a preset.
+ */
+export const PRESET_SELECTION = Object.freeze({ liangshen: true, emptySystem: true, promptLab: true })
+
+/** Validate one `config.presets` object and fill the defaults. */
+export function normalizePresetSelection(raw) {
+  const source = raw === undefined || raw === null ? {} : raw
+  if (typeof source !== 'object' || Array.isArray(source)) {
+    throw new TypeError('liangshen-anchored: presets must be an object')
+  }
+  const unknown = Object.keys(source).filter((key) => !(key in PRESET_SELECTION))
+  if (unknown.length > 0) {
+    throw new TypeError(
+      `liangshen-anchored: unknown presets key(s) ${unknown.join(', ')} — allowed: ${Object.keys(PRESET_SELECTION).join(', ')}`,
+    )
+  }
+  const selection = { ...PRESET_SELECTION }
+  for (const key of Object.keys(PRESET_SELECTION)) {
+    if (source[key] === undefined) continue
+    if (typeof source[key] !== 'boolean') throw new TypeError(`liangshen-anchored: presets.${key} must be a boolean`)
+    selection[key] = source[key]
+  }
+  return selection
+}
 
 /** Minimal preset.yml reader: `name`, `description`, `order` are plain scalars. */
 async function readMetadata(spec) {
@@ -176,9 +207,10 @@ async function defaultSyncPeers() {
 /**
  * Declare every bundled preset; one failure must not block the other.
  * @param {object} ctx Host context providing `agentPresets`
- * @param {{syncPeers?: () => Promise<object>}} [options]
+ * @param {{syncPeers?: () => Promise<object>, presets?: object}} [options]
  */
 export async function declarePresets(ctx, options = {}) {
+  const selection = normalizePresetSelection(options.presets)
   const syncPeers = options.syncPeers ?? defaultSyncPeers
   let peers
   try {
@@ -195,16 +227,18 @@ export async function declarePresets(ctx, options = {}) {
 
   const registry = ctx.get('agentPresets')
   if (registry === undefined || typeof registry.register !== 'function') {
-    await writeStatus({ declared: false, error: 'agentPresets service unavailable', presets: [], peers })
+    await writeStatus({ declared: false, error: 'agentPresets service unavailable', presets: [], enabled: selection, peers })
     return
   }
+  const enabled = PRESETS.filter((spec) => selection[spec.key] === true)
   const presets = []
-  for (const spec of PRESETS) presets.push(await declareOne(ctx, registry, spec))
+  for (const spec of enabled) presets.push(await declareOne(ctx, registry, spec))
   const base = presets.find((preset) => preset.id === 'liangshen')
   await writeStatus({
     declared: presets.every((preset) => preset.declared),
     peers,
     presets,
+    enabled: selection,
     // Backward-compatible single-preset projection: the diagnostics file is
     // read by hand and by older notes, so keep the original keys meaningful.
     ...(base === undefined ? {} : {
@@ -251,13 +285,25 @@ function installPromptLab(ctx) {
   if (typeof ctx.on === 'function') ctx.on('agent/pre-step', guard, { prepend: true })
 }
 
-export function apply(ctx) {
-  installPromptLab(ctx)
+export function apply(ctx, config) {
+  const source = config === undefined || config === null ? {} : config
+  if (typeof source !== 'object' || Array.isArray(source)) {
+    throw new TypeError('liangshen-anchored: config must be an object')
+  }
+  const unknown = Object.keys(source).filter((key) => key !== 'presets')
+  if (unknown.length > 0) {
+    throw new TypeError(`liangshen-anchored: unknown config key(s) ${unknown.join(', ')} — allowed: presets`)
+  }
+  const selection = normalizePresetSelection(source.presets)
+  // The prompt-lab Host half (projection + hard-switch guard) is only useful
+  // when the prompt-lab preset is declared; keep it off otherwise.
+  if (selection.promptLab) installPromptLab(ctx)
+  const options = { presets: selection }
   if (ctx.get('agentPresets') !== undefined) {
-    void declarePresets(ctx)
+    void declarePresets(ctx, options)
     return
   }
   ctx.inject(['agentPresets'], async (ready) => {
-    await declarePresets(ready)
+    await declarePresets(ready, options)
   })
 }

@@ -14,10 +14,14 @@
   "dsh": {
     "engines": {
       "dsh": ">=0.2.0-rc.2"
+    },
+    "bundle": {
+      "patch": "./cordis.patch.yml"
     }
   },
   "files": [
     "lib/",
-    "README.md"
+    "README.md",
+    "cordis.patch.yml"
   ]
 }
