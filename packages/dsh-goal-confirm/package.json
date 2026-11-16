@@ -28,7 +28,8 @@
       "dsh": ">=0.2.0-rc.2"
     },
     "bundle": {
-      "patch": "./cordis.patch.yml"
+      "patch": "./cordis.patch.yml",
+      "listedByDefault": false
     }
   }
 }

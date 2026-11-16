@@ -2,7 +2,7 @@
 # plugin with one preset selected. The plugin manager shows three components
 # and toggles them per row; `statusMode: merge` keeps the diagnostic file whole.
 - insert:
-    - id: preset-liangshen
+    - id: standalone-preset-liangshen
       name: '@mosire/dsh-liangshen-anchored'
       config:
         statusMode: merge
@@ -10,7 +10,7 @@
           liangshen: true
           emptySystem: false
           promptLab: false
-    - id: preset-liangshen-empty-system
+    - id: standalone-preset-empty-system
       name: '@mosire/dsh-liangshen-anchored'
       config:
         statusMode: merge
@@ -18,7 +18,7 @@
           liangshen: false
           emptySystem: true
           promptLab: false
-    - id: preset-minimal-prompt-lab
+    - id: standalone-preset-prompt-lab
       name: '@mosire/dsh-liangshen-anchored'
       config:
         statusMode: merge

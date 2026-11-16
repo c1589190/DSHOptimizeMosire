@@ -153,3 +153,54 @@
 - profile 的 bundles/deps 是本机环境改动，不在 git 内；3080 重启后插件页应显示 **1 个 dshom 条目 + 9 个组件**。
 - 组件包没有装进 profile 时，对应组件行会解析失败；`tools/doctor.mjs` 在 dshom 布局下会检查 9 个包的 link。
 - 旧 7-bundle 布局仍可手动使用（各包自带 patch），但 profile 已不再采用，二选一。
+
+## 2026-11-16 收尾 3：组件介绍 + 本机 profile 遗留清理
+
+用户反馈：「本地 dsh 装载了不少遗留的未清理插件配置，其次是你没有给组件补介绍」。
+
+### 组件标题/简介
+
+- 插件管理器的组件显示文本来自包内 `locale/<lang>.json` 的 `meta.title` / `meta.description`
+  （包根 specifier 才读 `package.json` 兜底；子路径 specifier 只读 locale）。此前 4 个功能包没有 locale，
+  3 个预设组件是子路径且没有子路径 locale，所以组件列表只有名字、没有介绍。
+- 新增：`dsh-job-tools` / `dsh-session-import` / `dsh-prompt-lab-session` / `dsh-session-inspect`
+  的 `locale/{en,zh}.json`，并在 `exports` / `files` 中导出。
+- 预设三个组件：`@mosire/dsh-liangshen-anchored` 增加
+  `./presets/{liangshen,empty-system,prompt-lab}/locale/{en,zh}.json` 与对应 exports；
+  每个子路径一个独立 locale 目录（解析器会遍历 en 所在目录，不能混放其它组件的语言文件）。
+- 新增 `tools/verify-component-meta.mjs`：读取 dshom patch 的 9 个组件 specifier，用运行中 DSH 的
+  `readPluginMeta` 解析，要求中英文 title + description 都存在。
+
+### 组件包不再作为独立插件出现在列表
+
+- 组件行 id 与独立 bundle patch 的行 id 相同会让插件管理器把组件包判成「有运行中的行」，
+  即使 `listedByDefault: false` 也会列出。把 7 个组件包自己的 patch 行 id 统一改为 `standalone-*`。
+- 7 个组件包的 `dsh.bundle` 都加 `listedByDefault: false`；它们仍是 profile 依赖（组件行解析需要），
+  但默认插件列表只显示 dshom。
+- 实机 `pluginManager.listBundles()`（3099）：本仓只有 dshom `enabled: true`；
+  7 个组件包 `listedByDefault: false`、`liveRows: 0`；dshom 声明 9 行且 9 行全部 live。
+
+### profile 清理（本机，不在 git）
+
+- `~/.dsh/profiles/web/cordis.patch.yml`：删除死行 `bili-native` / `bili-compaction-gate`
+  （备份 `cordis.patch.yml.bak-cleanup-2026-11-16`）。
+- 删除 5 个不再被任何 deps/bundles/patch 引用的遗留 link：
+  `@mosire/dsh-timing-annotations`、`dsh-iibot-wake-profile`、`dsh-inbox-mosire`、`dsh-persona-mode`、`iibot-dsh`。
+- 保留 bma3 / orbat / treg / deja 等 active 第三方；7 个 `@mosire` 组件包作为 dshom 依赖保留（默认隐藏）。
+- 仍存在但未动：`dsh-mcp-connector`、`dsh-mcp-panel`、`billion-context`（不在 bundles 中，用途未确认）；
+  如需继续清，请点名。
+
+### 验证
+
+- 单测 **302/302**；`node tools/sync-preset-variant.mjs --check` → in sync。
+- `node tools/doctor.mjs` → OK（`dshom components: 9`）。
+- `node tools/verify-component-meta.mjs` → **9/9 OK**（中英文标题+简介）。
+- `pluginManager.listBundles()` 实机检查 → **OK**（唯一启用的 @mosire bundle 是 dshom；组件包隐藏；9 行 live）。
+- `dsh --profile web --dump-config` → dshom 下 9 行组件，无 bili/iibot/inbox/persona/timing 残留。
+- 证据：`.superpowers/sdd/2026-11-16-subpackages/evidence/verify-component-meta.txt`、
+  `verify-component-listing.json`。
+
+### 注意
+
+- profile 的清理与 `listedByDefault` 依赖本机安装；重启 3080 后插件页应显示 1 个 dshom 条目 + 9 个带标题/简介的组件。
+- 旧的 7-bundle 布局和 bili 配置仍在备份文件里，需要回滚时用 `.bak-*`。

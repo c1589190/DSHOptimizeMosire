@@ -1,5 +1,5 @@
 # Standalone bundle for /import <path>. Enable this package directly (instead
 # of @mosire/dshom) to install only the session importer command.
 - insert:
-    - id: session-import
+    - id: standalone-session-import
       name: '@mosire/dsh-session-import'

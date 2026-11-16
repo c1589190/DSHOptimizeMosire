@@ -3,5 +3,5 @@
 # includeDelegatedAgents=false); override them in this row or from the Host
 # settings surface.
 - insert:
-    - id: subagent-access
+    - id: standalone-subagent-access
       name: '@mosire/dsh-subagent-access'

@@ -45,7 +45,8 @@ profile 的 `dsh.profile.bundles` 里只列一行 `@mosire/dshom`（本机为 `l
 ```
 
 装好后跑 `node tools/doctor.mjs` 检查 bundle 条目、组件包 link、peer symlink 农场与上次预设声明
-（doctor 同时支持「单 bundle 多组件」与「每个功能一个 bundle」两种布局）。
+（doctor 同时支持「单 bundle 多组件」与「每个功能一个 bundle」两种布局）；
+`node tools/verify-component-meta.mjs` 校验 9 个组件都有中英文标题与简介。
 每个功能包和预设包也带自己的 `dsh.bundle.patch`，可以脱离 dshom 单独安装（二选一，不要混用）；
 完整组件清单与独立子包说明见 [packages/dshom/README.md](packages/dshom/README.md)。
 预设的 `@deepseek-ai/*` peer 在每次 Host 激活时从运行中的 DSH 安装解析，因此不持久化安装路径。

@@ -6,7 +6,8 @@
   "description": "Agent-callable tool that creates a sibling session in a DSH workspace under the prompt-lab preset, applies a chosen system prompt, and optionally runs one task.",
   "exports": {
     ".": "./lib/index.js",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json"
   },
   "peerDependencies": {
     "@deepseek-ai/dsh": ">=0.2.0-rc.2"
@@ -16,12 +17,14 @@
       "dsh": ">=0.2.0-rc.2"
     },
     "bundle": {
-      "patch": "./cordis.patch.yml"
+      "patch": "./cordis.patch.yml",
+      "listedByDefault": false
     }
   },
   "files": [
     "lib/",
     "README.md",
-    "cordis.patch.yml"
+    "cordis.patch.yml",
+    "locale/"
   ]
 }

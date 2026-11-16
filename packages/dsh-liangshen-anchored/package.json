@@ -11,7 +11,13 @@
     "./icon.svg": "./icon.svg",
     "./presets/liangshen": "./lib/entries/liangshen.js",
     "./presets/empty-system": "./lib/entries/empty-system.js",
-    "./presets/prompt-lab": "./lib/entries/prompt-lab.js"
+    "./presets/prompt-lab": "./lib/entries/prompt-lab.js",
+    "./presets/liangshen/locale/en.json": "./lib/entries/liangshen/locale/en.json",
+    "./presets/liangshen/locale/zh.json": "./lib/entries/liangshen/locale/zh.json",
+    "./presets/empty-system/locale/en.json": "./lib/entries/empty-system/locale/en.json",
+    "./presets/empty-system/locale/zh.json": "./lib/entries/empty-system/locale/zh.json",
+    "./presets/prompt-lab/locale/en.json": "./lib/entries/prompt-lab/locale/en.json",
+    "./presets/prompt-lab/locale/zh.json": "./lib/entries/prompt-lab/locale/zh.json"
   },
   "peerDependencies": {
     "@deepseek-ai/dsh": ">=0.2.0-rc.2"
@@ -21,7 +27,8 @@
       "dsh": ">=0.2.0-rc.2"
     },
     "bundle": {
-      "patch": "./cordis.patch.yml"
+      "patch": "./cordis.patch.yml",
+      "listedByDefault": false
     }
   },
   "icon": "./icon.svg",

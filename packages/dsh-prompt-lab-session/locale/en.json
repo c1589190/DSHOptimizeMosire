@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Prompt-Lab Sessions",
+    "description": "prompt_lab_workspaces / prompt_lab_session: create a sibling session under the Minimal prompt-lab preset in a chosen workspace, with an optional prompt, model and one task, then return the final assistant text."
+  }
+}

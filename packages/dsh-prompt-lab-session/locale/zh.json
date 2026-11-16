@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Prompt-lab 会话编排",
+    "description": "prompt_lab_workspaces / prompt_lab_session：在指定工作区用「极简模式·提示词实验」新建同级会话，可选提示词、模型与一次性任务，并返回最终 assistant 文本。"
+  }
+}

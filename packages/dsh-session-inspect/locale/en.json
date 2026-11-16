@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Session Inspect",
+    "description": "session_list / session_read / session_find: read-only listing with workspace/preset/live filters, surface/raw/event views, and a literal scan over one session including system and developer messages."
+  }
+}

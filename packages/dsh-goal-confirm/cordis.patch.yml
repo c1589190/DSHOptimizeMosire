@@ -2,5 +2,5 @@
 # Config defaults live in lib/index.js (enabled=true, timeoutSeconds=30,
 # cancelOnClose=true); override them here or from the Host settings surface.
 - insert:
-    - id: goal-confirm
+    - id: standalone-goal-confirm
       name: '@mosire/dsh-goal-confirm'

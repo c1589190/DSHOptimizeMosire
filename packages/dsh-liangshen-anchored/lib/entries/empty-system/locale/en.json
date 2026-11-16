@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "LiangShen · Empty System Prompt",
+    "description": "Identical to LiangShen Mode; the only difference is a single ASCII space as the system prompt, for controlled comparison runs."
+  }
+}

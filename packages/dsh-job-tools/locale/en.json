@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Background Jobs",
+    "description": "job_wait / job_read: block until a background job finishes, then read its output at an absolute offset with deterministic compaction (ANSI/CR cleanup, adjacent duplicate collapse, head/tail/errors/summary) without consuming the job_output cursor."
+  }
+}

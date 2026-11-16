@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Session 导入",
+    "description": "用 /import <路径> 把 DSH 导出的 ZIP、裸 session.v4.jsonl 或多帧 zstd 写回会话库；整树导入、id 冲突改名、附件按内容寻址写回。"
+  }
+}

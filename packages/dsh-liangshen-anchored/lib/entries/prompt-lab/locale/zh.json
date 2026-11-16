@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "极简模式·提示词实验",
+    "description": "官方 Minimal 工具面 + /sp 会话级系统提示词；首个 system/message 即冻结，中途切换整段替换，含 prompt-lab 投影与切换守卫。"
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Minimal Prompt Lab",
+    "description": "Official Minimal tool surface plus /sp session-level system prompts: the first system message freezes the prompt, a later /sp replaces it as a whole, with the prompt-lab projection and switch guard."
+  }
+}

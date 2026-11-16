@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "LiangShen Mode",
+    "description": "Anchored preset: the first request exposes only the Minimal tool pair with zero auto-injected context, the full catalog opens after the first durable signal, and every compaction re-anchors and injects a recovery hint."
+  }
+}

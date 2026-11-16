@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "会话查看",
+    "description": "session_list / session_read / session_find：只读列出会话（工作区/预设/存活过滤），读取 surface/raw/event 三种视图，并在单会话内做含 system/developer 消息的字面扫描。"
+  }
+}

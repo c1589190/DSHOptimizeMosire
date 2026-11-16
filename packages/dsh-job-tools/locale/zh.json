@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "后台任务工具",
+    "description": "job_wait / job_read：阻塞等待后台任务结束，按绝对偏移读取输出并做 ANSI/CR 清理、相邻重复行合并与 head/tail/errors/summary 优化，不消费 job_output 游标。"
+  }
+}

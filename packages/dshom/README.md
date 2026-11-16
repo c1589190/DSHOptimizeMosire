@@ -29,6 +29,14 @@ DSH Optimize Mosire 的**唯一入口 bundle**：一个安装条目，插件页�
 组件包必须能从 profile 的 `node_modules` 解析（本机是 `link:`）；dshom 的 patch 只负责按行挂载，
 不再有旧的「一个 `dshom` 插件行统一 apply」形态。
 
+每个组件的标题/简介来自该包 `locale/zh.json` / `locale/en.json` 的 `meta.title` /
+`meta.description`（三个预设组件各自有独立的 locale 子路径）。校验：
+
+```sh
+node tools/verify-component-meta.mjs   # 逐组件走插件管理器的真实解析器，要求中英文标题+简介
+```
+
+
 ## 安装
 
 profile 的 `dsh.profile.bundles` 里只列一行 `@mosire/dshom`：
@@ -50,6 +58,9 @@ node tools/doctor.mjs        # 检查 bundle 条目 / 组件包 link / peer farm
 
 每个功能包和预设包也都有自己的 `dsh.bundle.patch`，可以**不装 dshom**，按需把其中几个列进
 `dsh.profile.bundles`（预设 bundle 的 patch 会插 3 个预设行）。两种布局**二选一**，不要同时启用。
+
+这些包都设置了 `dsh.bundle.listedByDefault: false`，独立 patch 的行 id 也以 `standalone-` 开头；
+因此默认插件列表只显示 dshom，不会因为它们是 profile 依赖而多出 7 个条目（组件页里的 9 行仍然是它们提供的）。
 
 | 包 | 单独启用后安装 |
 |---|---|

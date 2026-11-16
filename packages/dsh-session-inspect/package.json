@@ -6,7 +6,8 @@
   "description": "Read-only agent tools for inspecting other DSH sessions: list, current model context, raw log, event windows, and in-session text search.",
   "exports": {
     ".": "./lib/index.js",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json"
   },
   "peerDependencies": {
     "@deepseek-ai/dsh": ">=0.2.0-rc.2"
@@ -16,12 +17,14 @@
       "dsh": ">=0.2.0-rc.2"
     },
     "bundle": {
-      "patch": "./cordis.patch.yml"
+      "patch": "./cordis.patch.yml",
+      "listedByDefault": false
     }
   },
   "files": [
     "lib/",
     "README.md",
-    "cordis.patch.yml"
+    "cordis.patch.yml",
+    "locale/"
   ]
 }

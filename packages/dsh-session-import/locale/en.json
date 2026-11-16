@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Session Import",
+    "description": "Import a DSH session export with /import <path>: ZIP, bare session.v4.jsonl or multi-frame zstd. Imports the whole tree, renames colliding ids, and writes attachments back by content address."
+  }
+}
